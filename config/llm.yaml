@@ -1,0 +1,19 @@
+# LLM tier routing — default (local dev/test): mock everywhere.
+# Swap provider: mock|anthropic|openrouter per tier.
+# API keys come from env: ANTHROPIC_API_KEY, OPENROUTER_API_KEY.
+# model이 "openrouter-default"이면 OPENROUTER_DEFAULT_MODEL env로 폴백.
+#
+# Docker는 별도 config/llm.docker.yaml을 마운트하여 openrouter+deepseek 사용.
+# 로컬 dev에서 실 LLM 호출하려면 이 파일을 직접 편집하거나 별도 yaml로 override.
+
+cheap:
+  provider: mock
+  model: mock-haiku-stub
+
+expensive:
+  provider: mock
+  model: mock-opus-stub
+
+judge:
+  provider: mock
+  model: mock-judge-stub

@@ -1,0 +1,16 @@
+# LLM tier routing — Docker override (production-like).
+# docker-compose.yml이 이 파일을 /app/config/llm.yaml로 마운트하여 default를 대체한다.
+# 모든 tier가 OpenRouter 경유. model은 OPENROUTER_DEFAULT_MODEL env에서 해석.
+# (.env 파일에 OPENROUTER_API_KEY + OPENROUTER_DEFAULT_MODEL 정의)
+
+cheap:
+  provider: openrouter
+  model: openrouter-default
+
+expensive:
+  provider: openrouter
+  model: openrouter-default
+
+judge:
+  provider: openrouter
+  model: openrouter-default

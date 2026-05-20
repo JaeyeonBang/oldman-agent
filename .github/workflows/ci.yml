@@ -1,0 +1,40 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  test:
+    name: Test (Python 3.11)
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v3
+        with:
+          version: "0.10.9"
+
+      - name: Install Python 3.11
+        run: uv python install 3.11
+
+      - name: Install dependencies
+        run: uv pip install -e ".[dev]" --system
+
+      - name: Lint (ruff)
+        run: uv run ruff check .
+
+      - name: Type check (mypy)
+        run: uv run mypy --strict app/
+
+      - name: Tests + coverage
+        run: uv run pytest tests/ --cov=app --cov-report=term-missing --cov-fail-under=80
+
+      - name: EVAL-1 (reflection accuracy, mock)
+        run: uv run python eval/run_eval_1.py --mock
+
+      - name: EVAL-2 (citation grounding, mock)
+        run: uv run python eval/run_eval_2.py --mock

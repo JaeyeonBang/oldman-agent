@@ -1,0 +1,2015 @@
+{
+  "version": "1.0",
+  "description": "EVAL-2 citation grounding golden set (M4). 70 grounded + 30 hallucinated.",
+  "total": 100,
+  "grounded": 70,
+  "hallucinated": 30,
+  "hallucinated_categories": {
+    "hallucinated_invented_agent": 10,
+    "hallucinated_timestamp_swap": 5,
+    "hallucinated_role_swap": 5,
+    "hallucinated_fabricated_field": 10
+  },
+  "cases": [
+    {
+      "id": "g_000",
+      "category": "grounded",
+      "evidence_events": [
+        {
+          "event_id": "3cad91de-6b2c-33ac-926b-22f4563ef298",
+          "kind": "observation",
+          "source_agent": "agent_alice",
+          "payload": {
+            "action": "observation",
+            "source_agent": "agent_alice",
+            "month": "2026-01",
+            "item": "패킷 분석",
+            "count": 1
+          }
+        }
+      ],
+      "narrative": "agent_alice가 2026-01에 패킷 분석을(를) 1회 수행했습니다 [↑e3cad91de].",
+      "expected_hallucination": false
+    },
+    {
+      "id": "g_001",
+      "category": "grounded",
+      "evidence_events": [
+        {
+          "event_id": "dcdc9bd0-988f-30af-a4fe-6c5baeaf3266",
+          "kind": "observation",
+          "source_agent": "agent_alice",
+          "payload": {
+            "action": "observation",
+            "source_agent": "agent_alice",
+            "month": "2026-01",
+            "item": "로그 수집",
+            "count": 2
+          }
+        }
+      ],
+      "narrative": "agent_alice가 2026-01에 로그 수집을(를) 2회 수행했습니다 [↑edcdc9bd0].",
+      "expected_hallucination": false
+    },
+    {
+      "id": "g_002",
+      "category": "grounded",
+      "evidence_events": [
+        {
+          "event_id": "d4590b58-0c34-3c42-b7b8-1c96cea91cbb",
+          "kind": "observation",
+          "source_agent": "agent_alice",
+          "payload": {
+            "action": "observation",
+            "source_agent": "agent_alice",
+            "month": "2026-01",
+            "item": "이상 탐지",
+            "count": 3
+          }
+        }
+      ],
+      "narrative": "agent_alice가 2026-01에 이상 탐지을(를) 3회 수행했습니다 [↑ed4590b58].",
+      "expected_hallucination": false
+    },
+    {
+      "id": "g_003",
+      "category": "grounded",
+      "evidence_events": [
+        {
+          "event_id": "ce070787-d3f2-3414-aa76-bfda2893fb54",
+          "kind": "observation",
+          "source_agent": "agent_alice",
+          "payload": {
+            "action": "observation",
+            "source_agent": "agent_alice",
+            "month": "2026-01",
+            "item": "접근 시도",
+            "count": 4
+          }
+        }
+      ],
+      "narrative": "agent_alice가 2026-01에 접근 시도을(를) 4회 수행했습니다 [↑ece070787].",
+      "expected_hallucination": false
+    },
+    {
+      "id": "g_004",
+      "category": "grounded",
+      "evidence_events": [
+        {
+          "event_id": "2f6f1580-ab23-3d83-bf2c-82d94e0eb902",
+          "kind": "observation",
+          "source_agent": "agent_alice",
+          "payload": {
+            "action": "observation",
+            "source_agent": "agent_alice",
+            "month": "2026-01",
+            "item": "데이터 전송",
+            "count": 5
+          }
+        }
+      ],
+      "narrative": "agent_alice가 2026-01에 데이터 전송을(를) 5회 수행했습니다 [↑e2f6f1580].",
+      "expected_hallucination": false
+    },
+    {
+      "id": "g_005",
+      "category": "grounded",
+      "evidence_events": [
+        {
+          "event_id": "d848988f-3f78-3cfd-99c7-13bfd166a694",
+          "kind": "observation",
+          "source_agent": "agent_alice",
+          "payload": {
+            "action": "observation",
+            "source_agent": "agent_alice",
+            "month": "2026-01",
+            "item": "패킷 분석",
+            "count": 6
+          }
+        }
+      ],
+      "narrative": "agent_alice가 2026-01에 패킷 분석을(를) 6회 수행했습니다 [↑ed848988f].",
+      "expected_hallucination": false
+    },
+    {
+      "id": "g_006",
+      "category": "grounded",
+      "evidence_events": [
+        {
+          "event_id": "3a100819-1567-36b1-aa35-5bf4e5bc6850",
+          "kind": "observation",
+          "source_agent": "agent_alice",
+          "payload": {
+            "action": "observation",
+            "source_agent": "agent_alice",
+            "month": "2026-01",
+            "item": "로그 수집",
+            "count": 7
+          }
+        }
+      ],
+      "narrative": "agent_alice가 2026-01에 로그 수집을(를) 7회 수행했습니다 [↑e3a100819].",
+      "expected_hallucination": false
+    },
+    {
+      "id": "g_007",
+      "category": "grounded",
+      "evidence_events": [
+        {
+          "event_id": "8902d3e6-8c86-38c1-9e33-31d6c3aa8a43",
+          "kind": "observation",
+          "source_agent": "agent_alice",
+          "payload": {
+            "action": "observation",
+            "source_agent": "agent_alice",
+            "month": "2026-01",
+            "item": "이상 탐지",
+            "count": 8
+          }
+        }
+      ],
+      "narrative": "agent_alice가 2026-01에 이상 탐지을(를) 8회 수행했습니다 [↑e8902d3e6].",
+      "expected_hallucination": false
+    },
+    {
+      "id": "g_008",
+      "category": "grounded",
+      "evidence_events": [
+        {
+          "event_id": "ef32def6-37b0-3f40-ad5c-55e9078b3f79",
+          "kind": "observation",
+          "source_agent": "agent_alice",
+          "payload": {
+            "action": "observation",
+            "source_agent": "agent_alice",
+            "month": "2026-01",
+            "item": "접근 시도",
+            "count": 9
+          }
+        }
+      ],
+      "narrative": "agent_alice가 2026-01에 접근 시도을(를) 9회 수행했습니다 [↑eef32def6].",
+      "expected_hallucination": false
+    },
+    {
+      "id": "g_009",
+      "category": "grounded",
+      "evidence_events": [
+        {
+          "event_id": "2159671a-3095-377c-abce-dbe7035bdb6e",
+          "kind": "observation",
+          "source_agent": "agent_alice",
+          "payload": {
+            "action": "observation",
+            "source_agent": "agent_alice",
+            "month": "2026-01",
+            "item": "데이터 전송",
+            "count": 10
+          }
+        }
+      ],
+      "narrative": "agent_alice가 2026-01에 데이터 전송을(를) 10회 수행했습니다 [↑e2159671a].",
+      "expected_hallucination": false
+    },
+    {
+      "id": "g_010",
+      "category": "grounded",
+      "evidence_events": [
+        {
+          "event_id": "939613fe-ce0c-3020-aa64-a6eaf93d6a47",
+          "kind": "observation",
+          "source_agent": "agent_alice",
+          "payload": {
+            "action": "observation",
+            "source_agent": "agent_alice",
+            "month": "2026-01",
+            "item": "패킷 분석",
+            "count": 11
+          }
+        }
+      ],
+      "narrative": "agent_alice가 2026-01에 패킷 분석을(를) 11회 수행했습니다 [↑e939613fe].",
+      "expected_hallucination": false
+    },
+    {
+      "id": "g_011",
+      "category": "grounded",
+      "evidence_events": [
+        {
+          "event_id": "d83c9fdd-cd14-3721-803a-f1db2df82ec8",
+          "kind": "observation",
+          "source_agent": "agent_alice",
+          "payload": {
+            "action": "observation",
+            "source_agent": "agent_alice",
+            "month": "2026-01",
+            "item": "로그 수집",
+            "count": 12
+          }
+        }
+      ],
+      "narrative": "agent_alice가 2026-01에 로그 수집을(를) 12회 수행했습니다 [↑ed83c9fdd].",
+      "expected_hallucination": false
+    },
+    {
+      "id": "g_012",
+      "category": "grounded",
+      "evidence_events": [
+        {
+          "event_id": "221c5bea-0632-3ec1-a539-f9e5c79458ff",
+          "kind": "observation",
+          "source_agent": "agent_alice",
+          "payload": {
+            "action": "observation",
+            "source_agent": "agent_alice",
+            "month": "2026-01",
+            "item": "이상 탐지",
+            "count": 13
+          }
+        }
+      ],
+      "narrative": "agent_alice가 2026-01에 이상 탐지을(를) 13회 수행했습니다 [↑e221c5bea].",
+      "expected_hallucination": false
+    },
+    {
+      "id": "g_013",
+      "category": "grounded",
+      "evidence_events": [
+        {
+          "event_id": "cd34ec4e-4b3f-389f-9d5b-bf4e280c9af4",
+          "kind": "observation",
+          "source_agent": "agent_alice",
+          "payload": {
+            "action": "observation",
+            "source_agent": "agent_alice",
+            "month": "2026-01",
+            "item": "접근 시도",
+            "count": 14
+          }
+        }
+      ],
+      "narrative": "agent_alice가 2026-01에 접근 시도을(를) 14회 수행했습니다 [↑ecd34ec4e].",
+      "expected_hallucination": false
+    },
+    {
+      "id": "g_100",
+      "category": "grounded",
+      "evidence_events": [
+        {
+          "event_id": "34185133-ad59-39ba-b9db-ff2650f88f9b",
+          "kind": "report",
+          "source_agent": "agent_bob",
+          "payload": {
+            "action": "report",
+            "source_agent": "agent_bob",
+            "month": "2026-02",
+            "item": "패킷 분석",
+            "count": 1
+          }
+        }
+      ],
+      "narrative": "agent_bob가 2026-02에 패킷 분석을(를) 1회 수행했습니다 [↑e34185133].",
+      "expected_hallucination": false
+    },
+    {
+      "id": "g_101",
+      "category": "grounded",
+      "evidence_events": [
+        {
+          "event_id": "03eba36a-a0d9-3a52-a80c-6bd033112744",
+          "kind": "report",
+          "source_agent": "agent_bob",
+          "payload": {
+            "action": "report",
+            "source_agent": "agent_bob",
+            "month": "2026-02",
+            "item": "로그 수집",
+            "count": 2
+          }
+        }
+      ],
+      "narrative": "agent_bob가 2026-02에 로그 수집을(를) 2회 수행했습니다 [↑e03eba36a].",
+      "expected_hallucination": false
+    },
+    {
+      "id": "g_102",
+      "category": "grounded",
+      "evidence_events": [
+        {
+          "event_id": "fa55d698-d794-3e1e-a76d-981f6daff32f",
+          "kind": "report",
+          "source_agent": "agent_bob",
+          "payload": {
+            "action": "report",
+            "source_agent": "agent_bob",
+            "month": "2026-02",
+            "item": "이상 탐지",
+            "count": 3
+          }
+        }
+      ],
+      "narrative": "agent_bob가 2026-02에 이상 탐지을(를) 3회 수행했습니다 [↑efa55d698].",
+      "expected_hallucination": false
+    },
+    {
+      "id": "g_103",
+      "category": "grounded",
+      "evidence_events": [
+        {
+          "event_id": "b87f7e33-ce81-3c99-b471-7f9557560e02",
+          "kind": "report",
+          "source_agent": "agent_bob",
+          "payload": {
+            "action": "report",
+            "source_agent": "agent_bob",
+            "month": "2026-02",
+            "item": "접근 시도",
+            "count": 4
+          }
+        }
+      ],
+      "narrative": "agent_bob가 2026-02에 접근 시도을(를) 4회 수행했습니다 [↑eb87f7e33].",
+      "expected_hallucination": false
+    },
+    {
+      "id": "g_104",
+      "category": "grounded",
+      "evidence_events": [
+        {
+          "event_id": "b6b3f902-d8aa-3c28-b72e-0abf8f62c314",
+          "kind": "report",
+          "source_agent": "agent_bob",
+          "payload": {
+            "action": "report",
+            "source_agent": "agent_bob",
+            "month": "2026-02",
+            "item": "데이터 전송",
+            "count": 5
+          }
+        }
+      ],
+      "narrative": "agent_bob가 2026-02에 데이터 전송을(를) 5회 수행했습니다 [↑eb6b3f902].",
+      "expected_hallucination": false
+    },
+    {
+      "id": "g_105",
+      "category": "grounded",
+      "evidence_events": [
+        {
+          "event_id": "3d1ccff1-0bf6-3696-8c43-77e7d506de66",
+          "kind": "report",
+          "source_agent": "agent_bob",
+          "payload": {
+            "action": "report",
+            "source_agent": "agent_bob",
+            "month": "2026-02",
+            "item": "패킷 분석",
+            "count": 6
+          }
+        }
+      ],
+      "narrative": "agent_bob가 2026-02에 패킷 분석을(를) 6회 수행했습니다 [↑e3d1ccff1].",
+      "expected_hallucination": false
+    },
+    {
+      "id": "g_106",
+      "category": "grounded",
+      "evidence_events": [
+        {
+          "event_id": "d4bd1722-4f09-3bc7-9884-aa4b9a7b1b6e",
+          "kind": "report",
+          "source_agent": "agent_bob",
+          "payload": {
+            "action": "report",
+            "source_agent": "agent_bob",
+            "month": "2026-02",
+            "item": "로그 수집",
+            "count": 7
+          }
+        }
+      ],
+      "narrative": "agent_bob가 2026-02에 로그 수집을(를) 7회 수행했습니다 [↑ed4bd1722].",
+      "expected_hallucination": false
+    },
+    {
+      "id": "g_107",
+      "category": "grounded",
+      "evidence_events": [
+        {
+          "event_id": "ba017976-dcbe-3511-ab46-00d4ca61ede7",
+          "kind": "report",
+          "source_agent": "agent_bob",
+          "payload": {
+            "action": "report",
+            "source_agent": "agent_bob",
+            "month": "2026-02",
+            "item": "이상 탐지",
+            "count": 8
+          }
+        }
+      ],
+      "narrative": "agent_bob가 2026-02에 이상 탐지을(를) 8회 수행했습니다 [↑eba017976].",
+      "expected_hallucination": false
+    },
+    {
+      "id": "g_108",
+      "category": "grounded",
+      "evidence_events": [
+        {
+          "event_id": "78c85f86-67c4-3d45-8cc8-9cba1163c292",
+          "kind": "report",
+          "source_agent": "agent_bob",
+          "payload": {
+            "action": "report",
+            "source_agent": "agent_bob",
+            "month": "2026-02",
+            "item": "접근 시도",
+            "count": 9
+          }
+        }
+      ],
+      "narrative": "agent_bob가 2026-02에 접근 시도을(를) 9회 수행했습니다 [↑e78c85f86].",
+      "expected_hallucination": false
+    },
+    {
+      "id": "g_109",
+      "category": "grounded",
+      "evidence_events": [
+        {
+          "event_id": "9d064ea2-40c0-3806-8153-510b8461519d",
+          "kind": "report",
+          "source_agent": "agent_bob",
+          "payload": {
+            "action": "report",
+            "source_agent": "agent_bob",
+            "month": "2026-02",
+            "item": "데이터 전송",
+            "count": 10
+          }
+        }
+      ],
+      "narrative": "agent_bob가 2026-02에 데이터 전송을(를) 10회 수행했습니다 [↑e9d064ea2].",
+      "expected_hallucination": false
+    },
+    {
+      "id": "g_110",
+      "category": "grounded",
+      "evidence_events": [
+        {
+          "event_id": "100b5226-cdae-34a2-aed7-072f3b922ad4",
+          "kind": "report",
+          "source_agent": "agent_bob",
+          "payload": {
+            "action": "report",
+            "source_agent": "agent_bob",
+            "month": "2026-02",
+            "item": "패킷 분석",
+            "count": 11
+          }
+        }
+      ],
+      "narrative": "agent_bob가 2026-02에 패킷 분석을(를) 11회 수행했습니다 [↑e100b5226].",
+      "expected_hallucination": false
+    },
+    {
+      "id": "g_111",
+      "category": "grounded",
+      "evidence_events": [
+        {
+          "event_id": "50476863-0c34-3c0d-9601-6ab8ab1fb1e0",
+          "kind": "report",
+          "source_agent": "agent_bob",
+          "payload": {
+            "action": "report",
+            "source_agent": "agent_bob",
+            "month": "2026-02",
+            "item": "로그 수집",
+            "count": 12
+          }
+        }
+      ],
+      "narrative": "agent_bob가 2026-02에 로그 수집을(를) 12회 수행했습니다 [↑e50476863].",
+      "expected_hallucination": false
+    },
+    {
+      "id": "g_112",
+      "category": "grounded",
+      "evidence_events": [
+        {
+          "event_id": "b675384f-2a70-3278-9344-cbb9be332576",
+          "kind": "report",
+          "source_agent": "agent_bob",
+          "payload": {
+            "action": "report",
+            "source_agent": "agent_bob",
+            "month": "2026-02",
+            "item": "이상 탐지",
+            "count": 13
+          }
+        }
+      ],
+      "narrative": "agent_bob가 2026-02에 이상 탐지을(를) 13회 수행했습니다 [↑eb675384f].",
+      "expected_hallucination": false
+    },
+    {
+      "id": "g_113",
+      "category": "grounded",
+      "evidence_events": [
+        {
+          "event_id": "8fc04f78-2d80-3125-bd74-77a79c1b641e",
+          "kind": "report",
+          "source_agent": "agent_bob",
+          "payload": {
+            "action": "report",
+            "source_agent": "agent_bob",
+            "month": "2026-02",
+            "item": "접근 시도",
+            "count": 14
+          }
+        }
+      ],
+      "narrative": "agent_bob가 2026-02에 접근 시도을(를) 14회 수행했습니다 [↑e8fc04f78].",
+      "expected_hallucination": false
+    },
+    {
+      "id": "g_200",
+      "category": "grounded",
+      "evidence_events": [
+        {
+          "event_id": "697b3984-5d07-3c57-8325-ba3ed8b6e34f",
+          "kind": "alert",
+          "source_agent": "agent_carol",
+          "payload": {
+            "action": "alert",
+            "source_agent": "agent_carol",
+            "month": "2026-03",
+            "item": "패킷 분석",
+            "count": 1
+          }
+        }
+      ],
+      "narrative": "agent_carol가 2026-03에 패킷 분석을(를) 1회 수행했습니다 [↑e697b3984].",
+      "expected_hallucination": false
+    },
+    {
+      "id": "g_201",
+      "category": "grounded",
+      "evidence_events": [
+        {
+          "event_id": "7f3aa1c0-398a-3cba-b64c-a99e0797f57c",
+          "kind": "alert",
+          "source_agent": "agent_carol",
+          "payload": {
+            "action": "alert",
+            "source_agent": "agent_carol",
+            "month": "2026-03",
+            "item": "로그 수집",
+            "count": 2
+          }
+        }
+      ],
+      "narrative": "agent_carol가 2026-03에 로그 수집을(를) 2회 수행했습니다 [↑e7f3aa1c0].",
+      "expected_hallucination": false
+    },
+    {
+      "id": "g_202",
+      "category": "grounded",
+      "evidence_events": [
+        {
+          "event_id": "9f0ce896-5eab-356e-87b2-51bda083532b",
+          "kind": "alert",
+          "source_agent": "agent_carol",
+          "payload": {
+            "action": "alert",
+            "source_agent": "agent_carol",
+            "month": "2026-03",
+            "item": "이상 탐지",
+            "count": 3
+          }
+        }
+      ],
+      "narrative": "agent_carol가 2026-03에 이상 탐지을(를) 3회 수행했습니다 [↑e9f0ce896].",
+      "expected_hallucination": false
+    },
+    {
+      "id": "g_203",
+      "category": "grounded",
+      "evidence_events": [
+        {
+          "event_id": "a057b8ca-87c1-3918-90fd-cbada46328b3",
+          "kind": "alert",
+          "source_agent": "agent_carol",
+          "payload": {
+            "action": "alert",
+            "source_agent": "agent_carol",
+            "month": "2026-03",
+            "item": "접근 시도",
+            "count": 4
+          }
+        }
+      ],
+      "narrative": "agent_carol가 2026-03에 접근 시도을(를) 4회 수행했습니다 [↑ea057b8ca].",
+      "expected_hallucination": false
+    },
+    {
+      "id": "g_204",
+      "category": "grounded",
+      "evidence_events": [
+        {
+          "event_id": "477255e3-c084-3978-a160-8ae11263e41a",
+          "kind": "alert",
+          "source_agent": "agent_carol",
+          "payload": {
+            "action": "alert",
+            "source_agent": "agent_carol",
+            "month": "2026-03",
+            "item": "데이터 전송",
+            "count": 5
+          }
+        }
+      ],
+      "narrative": "agent_carol가 2026-03에 데이터 전송을(를) 5회 수행했습니다 [↑e477255e3].",
+      "expected_hallucination": false
+    },
+    {
+      "id": "g_205",
+      "category": "grounded",
+      "evidence_events": [
+        {
+          "event_id": "ffb015d1-1710-37fb-bb34-dee03fe99b6a",
+          "kind": "alert",
+          "source_agent": "agent_carol",
+          "payload": {
+            "action": "alert",
+            "source_agent": "agent_carol",
+            "month": "2026-03",
+            "item": "패킷 분석",
+            "count": 6
+          }
+        }
+      ],
+      "narrative": "agent_carol가 2026-03에 패킷 분석을(를) 6회 수행했습니다 [↑effb015d1].",
+      "expected_hallucination": false
+    },
+    {
+      "id": "g_206",
+      "category": "grounded",
+      "evidence_events": [
+        {
+          "event_id": "22901808-2439-36e3-a501-444c49cb7b12",
+          "kind": "alert",
+          "source_agent": "agent_carol",
+          "payload": {
+            "action": "alert",
+            "source_agent": "agent_carol",
+            "month": "2026-03",
+            "item": "로그 수집",
+            "count": 7
+          }
+        }
+      ],
+      "narrative": "agent_carol가 2026-03에 로그 수집을(를) 7회 수행했습니다 [↑e22901808].",
+      "expected_hallucination": false
+    },
+    {
+      "id": "g_207",
+      "category": "grounded",
+      "evidence_events": [
+        {
+          "event_id": "a62fb11f-a069-39d9-938d-df49f7929b2c",
+          "kind": "alert",
+          "source_agent": "agent_carol",
+          "payload": {
+            "action": "alert",
+            "source_agent": "agent_carol",
+            "month": "2026-03",
+            "item": "이상 탐지",
+            "count": 8
+          }
+        }
+      ],
+      "narrative": "agent_carol가 2026-03에 이상 탐지을(를) 8회 수행했습니다 [↑ea62fb11f].",
+      "expected_hallucination": false
+    },
+    {
+      "id": "g_208",
+      "category": "grounded",
+      "evidence_events": [
+        {
+          "event_id": "cd753509-bf89-34db-8d91-445d9d14bfd3",
+          "kind": "alert",
+          "source_agent": "agent_carol",
+          "payload": {
+            "action": "alert",
+            "source_agent": "agent_carol",
+            "month": "2026-03",
+            "item": "접근 시도",
+            "count": 9
+          }
+        }
+      ],
+      "narrative": "agent_carol가 2026-03에 접근 시도을(를) 9회 수행했습니다 [↑ecd753509].",
+      "expected_hallucination": false
+    },
+    {
+      "id": "g_209",
+      "category": "grounded",
+      "evidence_events": [
+        {
+          "event_id": "f7c44f92-e6d3-3c43-b52d-20419940a6c2",
+          "kind": "alert",
+          "source_agent": "agent_carol",
+          "payload": {
+            "action": "alert",
+            "source_agent": "agent_carol",
+            "month": "2026-03",
+            "item": "데이터 전송",
+            "count": 10
+          }
+        }
+      ],
+      "narrative": "agent_carol가 2026-03에 데이터 전송을(를) 10회 수행했습니다 [↑ef7c44f92].",
+      "expected_hallucination": false
+    },
+    {
+      "id": "g_210",
+      "category": "grounded",
+      "evidence_events": [
+        {
+          "event_id": "fc9d8923-d921-3636-b05d-eee6221772aa",
+          "kind": "alert",
+          "source_agent": "agent_carol",
+          "payload": {
+            "action": "alert",
+            "source_agent": "agent_carol",
+            "month": "2026-03",
+            "item": "패킷 분석",
+            "count": 11
+          }
+        }
+      ],
+      "narrative": "agent_carol가 2026-03에 패킷 분석을(를) 11회 수행했습니다 [↑efc9d8923].",
+      "expected_hallucination": false
+    },
+    {
+      "id": "g_211",
+      "category": "grounded",
+      "evidence_events": [
+        {
+          "event_id": "8dc8b9b6-c541-3738-906b-f40bc5eeffbc",
+          "kind": "alert",
+          "source_agent": "agent_carol",
+          "payload": {
+            "action": "alert",
+            "source_agent": "agent_carol",
+            "month": "2026-03",
+            "item": "로그 수집",
+            "count": 12
+          }
+        }
+      ],
+      "narrative": "agent_carol가 2026-03에 로그 수집을(를) 12회 수행했습니다 [↑e8dc8b9b6].",
+      "expected_hallucination": false
+    },
+    {
+      "id": "g_212",
+      "category": "grounded",
+      "evidence_events": [
+        {
+          "event_id": "c32fde03-0125-322c-b216-1ef5400c180b",
+          "kind": "alert",
+          "source_agent": "agent_carol",
+          "payload": {
+            "action": "alert",
+            "source_agent": "agent_carol",
+            "month": "2026-03",
+            "item": "이상 탐지",
+            "count": 13
+          }
+        }
+      ],
+      "narrative": "agent_carol가 2026-03에 이상 탐지을(를) 13회 수행했습니다 [↑ec32fde03].",
+      "expected_hallucination": false
+    },
+    {
+      "id": "g_213",
+      "category": "grounded",
+      "evidence_events": [
+        {
+          "event_id": "737309c2-1399-37f8-8a8e-5b8e2f89c82c",
+          "kind": "alert",
+          "source_agent": "agent_carol",
+          "payload": {
+            "action": "alert",
+            "source_agent": "agent_carol",
+            "month": "2026-03",
+            "item": "접근 시도",
+            "count": 14
+          }
+        }
+      ],
+      "narrative": "agent_carol가 2026-03에 접근 시도을(를) 14회 수행했습니다 [↑e737309c2].",
+      "expected_hallucination": false
+    },
+    {
+      "id": "g_300",
+      "category": "grounded",
+      "evidence_events": [
+        {
+          "event_id": "839038f7-2fea-38f0-a0d5-baccff78de6e",
+          "kind": "query",
+          "source_agent": "agent_dave",
+          "payload": {
+            "action": "query",
+            "source_agent": "agent_dave",
+            "month": "2026-04",
+            "item": "패킷 분석",
+            "count": 1
+          }
+        }
+      ],
+      "narrative": "agent_dave가 2026-04에 패킷 분석을(를) 1회 수행했습니다 [↑e839038f7].",
+      "expected_hallucination": false
+    },
+    {
+      "id": "g_301",
+      "category": "grounded",
+      "evidence_events": [
+        {
+          "event_id": "f2b1487b-b106-3094-b88a-e01e75399383",
+          "kind": "query",
+          "source_agent": "agent_dave",
+          "payload": {
+            "action": "query",
+            "source_agent": "agent_dave",
+            "month": "2026-04",
+            "item": "로그 수집",
+            "count": 2
+          }
+        }
+      ],
+      "narrative": "agent_dave가 2026-04에 로그 수집을(를) 2회 수행했습니다 [↑ef2b1487b].",
+      "expected_hallucination": false
+    },
+    {
+      "id": "g_302",
+      "category": "grounded",
+      "evidence_events": [
+        {
+          "event_id": "2d262770-e0e9-3fb1-a7a7-41aaff510d19",
+          "kind": "query",
+          "source_agent": "agent_dave",
+          "payload": {
+            "action": "query",
+            "source_agent": "agent_dave",
+            "month": "2026-04",
+            "item": "이상 탐지",
+            "count": 3
+          }
+        }
+      ],
+      "narrative": "agent_dave가 2026-04에 이상 탐지을(를) 3회 수행했습니다 [↑e2d262770].",
+      "expected_hallucination": false
+    },
+    {
+      "id": "g_303",
+      "category": "grounded",
+      "evidence_events": [
+        {
+          "event_id": "96319214-c081-3266-8f6d-27e7ae7085ef",
+          "kind": "query",
+          "source_agent": "agent_dave",
+          "payload": {
+            "action": "query",
+            "source_agent": "agent_dave",
+            "month": "2026-04",
+            "item": "접근 시도",
+            "count": 4
+          }
+        }
+      ],
+      "narrative": "agent_dave가 2026-04에 접근 시도을(를) 4회 수행했습니다 [↑e96319214].",
+      "expected_hallucination": false
+    },
+    {
+      "id": "g_304",
+      "category": "grounded",
+      "evidence_events": [
+        {
+          "event_id": "1183186c-2671-316b-b64d-6b0a7462417f",
+          "kind": "query",
+          "source_agent": "agent_dave",
+          "payload": {
+            "action": "query",
+            "source_agent": "agent_dave",
+            "month": "2026-04",
+            "item": "데이터 전송",
+            "count": 5
+          }
+        }
+      ],
+      "narrative": "agent_dave가 2026-04에 데이터 전송을(를) 5회 수행했습니다 [↑e1183186c].",
+      "expected_hallucination": false
+    },
+    {
+      "id": "g_305",
+      "category": "grounded",
+      "evidence_events": [
+        {
+          "event_id": "86a992a9-be16-36d9-b0ef-e98efa2bdb45",
+          "kind": "query",
+          "source_agent": "agent_dave",
+          "payload": {
+            "action": "query",
+            "source_agent": "agent_dave",
+            "month": "2026-04",
+            "item": "패킷 분석",
+            "count": 6
+          }
+        }
+      ],
+      "narrative": "agent_dave가 2026-04에 패킷 분석을(를) 6회 수행했습니다 [↑e86a992a9].",
+      "expected_hallucination": false
+    },
+    {
+      "id": "g_306",
+      "category": "grounded",
+      "evidence_events": [
+        {
+          "event_id": "9463d4ca-1670-3fbd-9f6c-5ba8f6618022",
+          "kind": "query",
+          "source_agent": "agent_dave",
+          "payload": {
+            "action": "query",
+            "source_agent": "agent_dave",
+            "month": "2026-04",
+            "item": "로그 수집",
+            "count": 7
+          }
+        }
+      ],
+      "narrative": "agent_dave가 2026-04에 로그 수집을(를) 7회 수행했습니다 [↑e9463d4ca].",
+      "expected_hallucination": false
+    },
+    {
+      "id": "g_307",
+      "category": "grounded",
+      "evidence_events": [
+        {
+          "event_id": "fb78d808-488d-3ea3-b711-f20155482f83",
+          "kind": "query",
+          "source_agent": "agent_dave",
+          "payload": {
+            "action": "query",
+            "source_agent": "agent_dave",
+            "month": "2026-04",
+            "item": "이상 탐지",
+            "count": 8
+          }
+        }
+      ],
+      "narrative": "agent_dave가 2026-04에 이상 탐지을(를) 8회 수행했습니다 [↑efb78d808].",
+      "expected_hallucination": false
+    },
+    {
+      "id": "g_308",
+      "category": "grounded",
+      "evidence_events": [
+        {
+          "event_id": "5eb1c746-b5bf-315f-afeb-7a0fbba0a881",
+          "kind": "query",
+          "source_agent": "agent_dave",
+          "payload": {
+            "action": "query",
+            "source_agent": "agent_dave",
+            "month": "2026-04",
+            "item": "접근 시도",
+            "count": 9
+          }
+        }
+      ],
+      "narrative": "agent_dave가 2026-04에 접근 시도을(를) 9회 수행했습니다 [↑e5eb1c746].",
+      "expected_hallucination": false
+    },
+    {
+      "id": "g_309",
+      "category": "grounded",
+      "evidence_events": [
+        {
+          "event_id": "87fbf363-e64a-3e50-b82c-41c8b0466ef9",
+          "kind": "query",
+          "source_agent": "agent_dave",
+          "payload": {
+            "action": "query",
+            "source_agent": "agent_dave",
+            "month": "2026-04",
+            "item": "데이터 전송",
+            "count": 10
+          }
+        }
+      ],
+      "narrative": "agent_dave가 2026-04에 데이터 전송을(를) 10회 수행했습니다 [↑e87fbf363].",
+      "expected_hallucination": false
+    },
+    {
+      "id": "g_310",
+      "category": "grounded",
+      "evidence_events": [
+        {
+          "event_id": "26db2a6c-bdd3-38ee-a2c9-b203397ef6a0",
+          "kind": "query",
+          "source_agent": "agent_dave",
+          "payload": {
+            "action": "query",
+            "source_agent": "agent_dave",
+            "month": "2026-04",
+            "item": "패킷 분석",
+            "count": 11
+          }
+        }
+      ],
+      "narrative": "agent_dave가 2026-04에 패킷 분석을(를) 11회 수행했습니다 [↑e26db2a6c].",
+      "expected_hallucination": false
+    },
+    {
+      "id": "g_311",
+      "category": "grounded",
+      "evidence_events": [
+        {
+          "event_id": "f6ee322d-773b-35bc-b1c2-411c66bf06fd",
+          "kind": "query",
+          "source_agent": "agent_dave",
+          "payload": {
+            "action": "query",
+            "source_agent": "agent_dave",
+            "month": "2026-04",
+            "item": "로그 수집",
+            "count": 12
+          }
+        }
+      ],
+      "narrative": "agent_dave가 2026-04에 로그 수집을(를) 12회 수행했습니다 [↑ef6ee322d].",
+      "expected_hallucination": false
+    },
+    {
+      "id": "g_312",
+      "category": "grounded",
+      "evidence_events": [
+        {
+          "event_id": "cfc1b95a-a915-3e99-993b-f338cd82682e",
+          "kind": "query",
+          "source_agent": "agent_dave",
+          "payload": {
+            "action": "query",
+            "source_agent": "agent_dave",
+            "month": "2026-04",
+            "item": "이상 탐지",
+            "count": 13
+          }
+        }
+      ],
+      "narrative": "agent_dave가 2026-04에 이상 탐지을(를) 13회 수행했습니다 [↑ecfc1b95a].",
+      "expected_hallucination": false
+    },
+    {
+      "id": "g_313",
+      "category": "grounded",
+      "evidence_events": [
+        {
+          "event_id": "d7a02665-5c11-3146-9f1b-d330abbf1986",
+          "kind": "query",
+          "source_agent": "agent_dave",
+          "payload": {
+            "action": "query",
+            "source_agent": "agent_dave",
+            "month": "2026-04",
+            "item": "접근 시도",
+            "count": 14
+          }
+        }
+      ],
+      "narrative": "agent_dave가 2026-04에 접근 시도을(를) 14회 수행했습니다 [↑ed7a02665].",
+      "expected_hallucination": false
+    },
+    {
+      "id": "g_400",
+      "category": "grounded",
+      "evidence_events": [
+        {
+          "event_id": "57515319-feaa-3b3b-a690-89d36602f232",
+          "kind": "response",
+          "source_agent": "agent_eve",
+          "payload": {
+            "action": "response",
+            "source_agent": "agent_eve",
+            "month": "2026-05",
+            "item": "패킷 분석",
+            "count": 1
+          }
+        }
+      ],
+      "narrative": "agent_eve가 2026-05에 패킷 분석을(를) 1회 수행했습니다 [↑e57515319].",
+      "expected_hallucination": false
+    },
+    {
+      "id": "g_401",
+      "category": "grounded",
+      "evidence_events": [
+        {
+          "event_id": "1a66ecb5-4cf0-3b3e-aada-47f1c33eda37",
+          "kind": "response",
+          "source_agent": "agent_eve",
+          "payload": {
+            "action": "response",
+            "source_agent": "agent_eve",
+            "month": "2026-05",
+            "item": "로그 수집",
+            "count": 2
+          }
+        }
+      ],
+      "narrative": "agent_eve가 2026-05에 로그 수집을(를) 2회 수행했습니다 [↑e1a66ecb5].",
+      "expected_hallucination": false
+    },
+    {
+      "id": "g_402",
+      "category": "grounded",
+      "evidence_events": [
+        {
+          "event_id": "0dc7ad3b-012d-3578-90c7-c0b8534be41b",
+          "kind": "response",
+          "source_agent": "agent_eve",
+          "payload": {
+            "action": "response",
+            "source_agent": "agent_eve",
+            "month": "2026-05",
+            "item": "이상 탐지",
+            "count": 3
+          }
+        }
+      ],
+      "narrative": "agent_eve가 2026-05에 이상 탐지을(를) 3회 수행했습니다 [↑e0dc7ad3b].",
+      "expected_hallucination": false
+    },
+    {
+      "id": "g_403",
+      "category": "grounded",
+      "evidence_events": [
+        {
+          "event_id": "229ab8e4-4620-3042-a142-796222acd990",
+          "kind": "response",
+          "source_agent": "agent_eve",
+          "payload": {
+            "action": "response",
+            "source_agent": "agent_eve",
+            "month": "2026-05",
+            "item": "접근 시도",
+            "count": 4
+          }
+        }
+      ],
+      "narrative": "agent_eve가 2026-05에 접근 시도을(를) 4회 수행했습니다 [↑e229ab8e4].",
+      "expected_hallucination": false
+    },
+    {
+      "id": "g_404",
+      "category": "grounded",
+      "evidence_events": [
+        {
+          "event_id": "b49a9441-2684-36aa-bec5-26d363dbb531",
+          "kind": "response",
+          "source_agent": "agent_eve",
+          "payload": {
+            "action": "response",
+            "source_agent": "agent_eve",
+            "month": "2026-05",
+            "item": "데이터 전송",
+            "count": 5
+          }
+        }
+      ],
+      "narrative": "agent_eve가 2026-05에 데이터 전송을(를) 5회 수행했습니다 [↑eb49a9441].",
+      "expected_hallucination": false
+    },
+    {
+      "id": "g_405",
+      "category": "grounded",
+      "evidence_events": [
+        {
+          "event_id": "8677ba13-f9f2-32e5-b74a-0ba9c2e9542a",
+          "kind": "response",
+          "source_agent": "agent_eve",
+          "payload": {
+            "action": "response",
+            "source_agent": "agent_eve",
+            "month": "2026-05",
+            "item": "패킷 분석",
+            "count": 6
+          }
+        }
+      ],
+      "narrative": "agent_eve가 2026-05에 패킷 분석을(를) 6회 수행했습니다 [↑e8677ba13].",
+      "expected_hallucination": false
+    },
+    {
+      "id": "g_406",
+      "category": "grounded",
+      "evidence_events": [
+        {
+          "event_id": "ea86eb5c-26e4-3c67-9b58-dc5fe68e2a76",
+          "kind": "response",
+          "source_agent": "agent_eve",
+          "payload": {
+            "action": "response",
+            "source_agent": "agent_eve",
+            "month": "2026-05",
+            "item": "로그 수집",
+            "count": 7
+          }
+        }
+      ],
+      "narrative": "agent_eve가 2026-05에 로그 수집을(를) 7회 수행했습니다 [↑eea86eb5c].",
+      "expected_hallucination": false
+    },
+    {
+      "id": "g_407",
+      "category": "grounded",
+      "evidence_events": [
+        {
+          "event_id": "56836068-a5dd-3fdc-8cb1-7adc57aa502d",
+          "kind": "response",
+          "source_agent": "agent_eve",
+          "payload": {
+            "action": "response",
+            "source_agent": "agent_eve",
+            "month": "2026-05",
+            "item": "이상 탐지",
+            "count": 8
+          }
+        }
+      ],
+      "narrative": "agent_eve가 2026-05에 이상 탐지을(를) 8회 수행했습니다 [↑e56836068].",
+      "expected_hallucination": false
+    },
+    {
+      "id": "g_408",
+      "category": "grounded",
+      "evidence_events": [
+        {
+          "event_id": "ad73cf5f-e153-3f34-b67c-bb8c9850d6b3",
+          "kind": "response",
+          "source_agent": "agent_eve",
+          "payload": {
+            "action": "response",
+            "source_agent": "agent_eve",
+            "month": "2026-05",
+            "item": "접근 시도",
+            "count": 9
+          }
+        }
+      ],
+      "narrative": "agent_eve가 2026-05에 접근 시도을(를) 9회 수행했습니다 [↑ead73cf5f].",
+      "expected_hallucination": false
+    },
+    {
+      "id": "g_409",
+      "category": "grounded",
+      "evidence_events": [
+        {
+          "event_id": "143af062-45f0-3e0c-899e-38d9acf38bca",
+          "kind": "response",
+          "source_agent": "agent_eve",
+          "payload": {
+            "action": "response",
+            "source_agent": "agent_eve",
+            "month": "2026-05",
+            "item": "데이터 전송",
+            "count": 10
+          }
+        }
+      ],
+      "narrative": "agent_eve가 2026-05에 데이터 전송을(를) 10회 수행했습니다 [↑e143af062].",
+      "expected_hallucination": false
+    },
+    {
+      "id": "g_410",
+      "category": "grounded",
+      "evidence_events": [
+        {
+          "event_id": "93537118-ea85-3267-ab5b-189d40f4cf7c",
+          "kind": "response",
+          "source_agent": "agent_eve",
+          "payload": {
+            "action": "response",
+            "source_agent": "agent_eve",
+            "month": "2026-05",
+            "item": "패킷 분석",
+            "count": 11
+          }
+        }
+      ],
+      "narrative": "agent_eve가 2026-05에 패킷 분석을(를) 11회 수행했습니다 [↑e93537118].",
+      "expected_hallucination": false
+    },
+    {
+      "id": "g_411",
+      "category": "grounded",
+      "evidence_events": [
+        {
+          "event_id": "63dbc9cb-0666-3444-a8a6-22e64f06485b",
+          "kind": "response",
+          "source_agent": "agent_eve",
+          "payload": {
+            "action": "response",
+            "source_agent": "agent_eve",
+            "month": "2026-05",
+            "item": "로그 수집",
+            "count": 12
+          }
+        }
+      ],
+      "narrative": "agent_eve가 2026-05에 로그 수집을(를) 12회 수행했습니다 [↑e63dbc9cb].",
+      "expected_hallucination": false
+    },
+    {
+      "id": "g_412",
+      "category": "grounded",
+      "evidence_events": [
+        {
+          "event_id": "cd4b8321-7907-38df-940e-a86794e3561c",
+          "kind": "response",
+          "source_agent": "agent_eve",
+          "payload": {
+            "action": "response",
+            "source_agent": "agent_eve",
+            "month": "2026-05",
+            "item": "이상 탐지",
+            "count": 13
+          }
+        }
+      ],
+      "narrative": "agent_eve가 2026-05에 이상 탐지을(를) 13회 수행했습니다 [↑ecd4b8321].",
+      "expected_hallucination": false
+    },
+    {
+      "id": "g_413",
+      "category": "grounded",
+      "evidence_events": [
+        {
+          "event_id": "3024b495-6209-3ddb-9523-b06d7da25330",
+          "kind": "response",
+          "source_agent": "agent_eve",
+          "payload": {
+            "action": "response",
+            "source_agent": "agent_eve",
+            "month": "2026-05",
+            "item": "접근 시도",
+            "count": 14
+          }
+        }
+      ],
+      "narrative": "agent_eve가 2026-05에 접근 시도을(를) 14회 수행했습니다 [↑e3024b495].",
+      "expected_hallucination": false
+    },
+    {
+      "id": "h_00",
+      "category": "hallucinated_invented_agent",
+      "evidence_events": [
+        {
+          "event_id": "06d14e8d-257a-32b3-8066-a1e02e6f5788",
+          "kind": "observation",
+          "source_agent": "agent_alice",
+          "payload": {
+            "action": "observation",
+            "source_agent": "agent_alice",
+            "month": "2026-01",
+            "item": "패킷 분석",
+            "count": 1
+          }
+        }
+      ],
+      "narrative": "FABRICATED_agent_zara가 2026-01에 패킷 분석을(를) 수행했습니다 [↑e06d14e8d].",
+      "expected_hallucination": true
+    },
+    {
+      "id": "h_01",
+      "category": "hallucinated_timestamp_swap",
+      "evidence_events": [
+        {
+          "event_id": "f8427708-677d-3b3d-8530-11e19e658b46",
+          "kind": "observation",
+          "source_agent": "agent_alice",
+          "payload": {
+            "action": "observation",
+            "source_agent": "agent_alice",
+            "month": "2026-01",
+            "item": "패킷 분석",
+            "count": 1
+          }
+        }
+      ],
+      "narrative": "agent_alice가 FABRICATED_2025-07에 패킷 분석을(를) 수행했습니다 [↑ef8427708].",
+      "expected_hallucination": true
+    },
+    {
+      "id": "h_02",
+      "category": "hallucinated_role_swap",
+      "evidence_events": [
+        {
+          "event_id": "f6a7db0c-bc8d-3319-96fc-7a5eee17cb54",
+          "kind": "observation",
+          "source_agent": "agent_alice",
+          "payload": {
+            "action": "observation",
+            "source_agent": "agent_alice",
+            "month": "2026-01",
+            "item": "패킷 분석",
+            "count": 1
+          }
+        }
+      ],
+      "narrative": "FABRICATED_agent_nina가 agent_alice에게 명령을 내렸습니다 [↑ef6a7db0c].",
+      "expected_hallucination": true
+    },
+    {
+      "id": "h_03",
+      "category": "hallucinated_fabricated_field",
+      "evidence_events": [
+        {
+          "event_id": "91a93786-8d2e-3a52-9f27-e1f070725539",
+          "kind": "observation",
+          "source_agent": "agent_alice",
+          "payload": {
+            "action": "observation",
+            "source_agent": "agent_alice",
+            "month": "2026-01",
+            "item": "패킷 분석",
+            "count": 1
+          }
+        }
+      ],
+      "narrative": "agent_alice가 FABRICATED_외부 유출을(를) 2026-01에 실행했습니다 [↑e91a93786].",
+      "expected_hallucination": true
+    },
+    {
+      "id": "h_04",
+      "category": "hallucinated_invented_agent",
+      "evidence_events": [
+        {
+          "event_id": "f122d68a-54f0-3741-83ba-f0a8f197f716",
+          "kind": "observation",
+          "source_agent": "agent_alice",
+          "payload": {
+            "action": "observation",
+            "source_agent": "agent_alice",
+            "month": "2026-01",
+            "item": "패킷 분석",
+            "count": 1
+          }
+        }
+      ],
+      "narrative": "FABRICATED_agent_mia가 2026-01에 패킷 분석을(를) 수행했습니다 [↑ef122d68a].",
+      "expected_hallucination": true
+    },
+    {
+      "id": "h_05",
+      "category": "hallucinated_fabricated_field",
+      "evidence_events": [
+        {
+          "event_id": "3b7e2dbe-c93b-34da-b8e7-23c2b70eaa6f",
+          "kind": "observation",
+          "source_agent": "agent_alice",
+          "payload": {
+            "action": "observation",
+            "source_agent": "agent_alice",
+            "month": "2026-01",
+            "item": "패킷 분석",
+            "count": 1
+          }
+        }
+      ],
+      "narrative": "agent_alice가 FABRICATED_암호화 해제을(를) 2026-01에 실행했습니다 [↑e3b7e2dbe].",
+      "expected_hallucination": true
+    },
+    {
+      "id": "h_10",
+      "category": "hallucinated_invented_agent",
+      "evidence_events": [
+        {
+          "event_id": "84ae3963-241a-391a-a548-ff0244c94e0f",
+          "kind": "report",
+          "source_agent": "agent_bob",
+          "payload": {
+            "action": "report",
+            "source_agent": "agent_bob",
+            "month": "2026-02",
+            "item": "로그 수집",
+            "count": 1
+          }
+        }
+      ],
+      "narrative": "FABRICATED_agent_zara가 2026-02에 로그 수집을(를) 수행했습니다 [↑e84ae3963].",
+      "expected_hallucination": true
+    },
+    {
+      "id": "h_11",
+      "category": "hallucinated_timestamp_swap",
+      "evidence_events": [
+        {
+          "event_id": "e14a1258-bf99-3486-8451-d7e0d2cc2ff6",
+          "kind": "report",
+          "source_agent": "agent_bob",
+          "payload": {
+            "action": "report",
+            "source_agent": "agent_bob",
+            "month": "2026-02",
+            "item": "로그 수집",
+            "count": 1
+          }
+        }
+      ],
+      "narrative": "agent_bob가 FABRICATED_2025-07에 로그 수집을(를) 수행했습니다 [↑ee14a1258].",
+      "expected_hallucination": true
+    },
+    {
+      "id": "h_12",
+      "category": "hallucinated_role_swap",
+      "evidence_events": [
+        {
+          "event_id": "d91cb0f6-eeee-3407-92c3-718aa182c915",
+          "kind": "report",
+          "source_agent": "agent_bob",
+          "payload": {
+            "action": "report",
+            "source_agent": "agent_bob",
+            "month": "2026-02",
+            "item": "로그 수집",
+            "count": 1
+          }
+        }
+      ],
+      "narrative": "FABRICATED_agent_nina가 agent_bob에게 명령을 내렸습니다 [↑ed91cb0f6].",
+      "expected_hallucination": true
+    },
+    {
+      "id": "h_13",
+      "category": "hallucinated_fabricated_field",
+      "evidence_events": [
+        {
+          "event_id": "450271fa-75fa-318c-9b06-4c2a2af1a528",
+          "kind": "report",
+          "source_agent": "agent_bob",
+          "payload": {
+            "action": "report",
+            "source_agent": "agent_bob",
+            "month": "2026-02",
+            "item": "로그 수집",
+            "count": 1
+          }
+        }
+      ],
+      "narrative": "agent_bob가 FABRICATED_외부 유출을(를) 2026-02에 실행했습니다 [↑e450271fa].",
+      "expected_hallucination": true
+    },
+    {
+      "id": "h_14",
+      "category": "hallucinated_invented_agent",
+      "evidence_events": [
+        {
+          "event_id": "69deeb27-a8e8-3339-a9a1-9f9af72ff32d",
+          "kind": "report",
+          "source_agent": "agent_bob",
+          "payload": {
+            "action": "report",
+            "source_agent": "agent_bob",
+            "month": "2026-02",
+            "item": "로그 수집",
+            "count": 1
+          }
+        }
+      ],
+      "narrative": "FABRICATED_agent_mia가 2026-02에 로그 수집을(를) 수행했습니다 [↑e69deeb27].",
+      "expected_hallucination": true
+    },
+    {
+      "id": "h_15",
+      "category": "hallucinated_fabricated_field",
+      "evidence_events": [
+        {
+          "event_id": "36e42788-cb12-38be-8192-fb7a4059ab4c",
+          "kind": "report",
+          "source_agent": "agent_bob",
+          "payload": {
+            "action": "report",
+            "source_agent": "agent_bob",
+            "month": "2026-02",
+            "item": "로그 수집",
+            "count": 1
+          }
+        }
+      ],
+      "narrative": "agent_bob가 FABRICATED_암호화 해제을(를) 2026-02에 실행했습니다 [↑e36e42788].",
+      "expected_hallucination": true
+    },
+    {
+      "id": "h_20",
+      "category": "hallucinated_invented_agent",
+      "evidence_events": [
+        {
+          "event_id": "063d11e3-12fe-3644-bdf6-1dda53224f34",
+          "kind": "alert",
+          "source_agent": "agent_carol",
+          "payload": {
+            "action": "alert",
+            "source_agent": "agent_carol",
+            "month": "2026-03",
+            "item": "이상 탐지",
+            "count": 1
+          }
+        }
+      ],
+      "narrative": "FABRICATED_agent_zara가 2026-03에 이상 탐지을(를) 수행했습니다 [↑e063d11e3].",
+      "expected_hallucination": true
+    },
+    {
+      "id": "h_21",
+      "category": "hallucinated_timestamp_swap",
+      "evidence_events": [
+        {
+          "event_id": "24235a78-ac31-3a3b-85ca-32136e9759d8",
+          "kind": "alert",
+          "source_agent": "agent_carol",
+          "payload": {
+            "action": "alert",
+            "source_agent": "agent_carol",
+            "month": "2026-03",
+            "item": "이상 탐지",
+            "count": 1
+          }
+        }
+      ],
+      "narrative": "agent_carol가 FABRICATED_2025-07에 이상 탐지을(를) 수행했습니다 [↑e24235a78].",
+      "expected_hallucination": true
+    },
+    {
+      "id": "h_22",
+      "category": "hallucinated_role_swap",
+      "evidence_events": [
+        {
+          "event_id": "3429c0c6-e392-3186-80ab-fc3cdd0e5c6b",
+          "kind": "alert",
+          "source_agent": "agent_carol",
+          "payload": {
+            "action": "alert",
+            "source_agent": "agent_carol",
+            "month": "2026-03",
+            "item": "이상 탐지",
+            "count": 1
+          }
+        }
+      ],
+      "narrative": "FABRICATED_agent_nina가 agent_carol에게 명령을 내렸습니다 [↑e3429c0c6].",
+      "expected_hallucination": true
+    },
+    {
+      "id": "h_23",
+      "category": "hallucinated_fabricated_field",
+      "evidence_events": [
+        {
+          "event_id": "5a2b96a0-98d7-35cf-bd17-6def8479e624",
+          "kind": "alert",
+          "source_agent": "agent_carol",
+          "payload": {
+            "action": "alert",
+            "source_agent": "agent_carol",
+            "month": "2026-03",
+            "item": "이상 탐지",
+            "count": 1
+          }
+        }
+      ],
+      "narrative": "agent_carol가 FABRICATED_외부 유출을(를) 2026-03에 실행했습니다 [↑e5a2b96a0].",
+      "expected_hallucination": true
+    },
+    {
+      "id": "h_24",
+      "category": "hallucinated_invented_agent",
+      "evidence_events": [
+        {
+          "event_id": "89021874-35c4-348e-a9de-4d0467f4c63b",
+          "kind": "alert",
+          "source_agent": "agent_carol",
+          "payload": {
+            "action": "alert",
+            "source_agent": "agent_carol",
+            "month": "2026-03",
+            "item": "이상 탐지",
+            "count": 1
+          }
+        }
+      ],
+      "narrative": "FABRICATED_agent_mia가 2026-03에 이상 탐지을(를) 수행했습니다 [↑e89021874].",
+      "expected_hallucination": true
+    },
+    {
+      "id": "h_25",
+      "category": "hallucinated_fabricated_field",
+      "evidence_events": [
+        {
+          "event_id": "b31f093f-8603-3d45-9f29-4c0cbd4f94b1",
+          "kind": "alert",
+          "source_agent": "agent_carol",
+          "payload": {
+            "action": "alert",
+            "source_agent": "agent_carol",
+            "month": "2026-03",
+            "item": "이상 탐지",
+            "count": 1
+          }
+        }
+      ],
+      "narrative": "agent_carol가 FABRICATED_암호화 해제을(를) 2026-03에 실행했습니다 [↑eb31f093f].",
+      "expected_hallucination": true
+    },
+    {
+      "id": "h_30",
+      "category": "hallucinated_invented_agent",
+      "evidence_events": [
+        {
+          "event_id": "5129f8e0-a7c8-3733-bb7c-0fb81821bace",
+          "kind": "query",
+          "source_agent": "agent_dave",
+          "payload": {
+            "action": "query",
+            "source_agent": "agent_dave",
+            "month": "2026-04",
+            "item": "접근 시도",
+            "count": 1
+          }
+        }
+      ],
+      "narrative": "FABRICATED_agent_zara가 2026-04에 접근 시도을(를) 수행했습니다 [↑e5129f8e0].",
+      "expected_hallucination": true
+    },
+    {
+      "id": "h_31",
+      "category": "hallucinated_timestamp_swap",
+      "evidence_events": [
+        {
+          "event_id": "1fade9cd-9542-3105-b117-d1b7558a763d",
+          "kind": "query",
+          "source_agent": "agent_dave",
+          "payload": {
+            "action": "query",
+            "source_agent": "agent_dave",
+            "month": "2026-04",
+            "item": "접근 시도",
+            "count": 1
+          }
+        }
+      ],
+      "narrative": "agent_dave가 FABRICATED_2025-07에 접근 시도을(를) 수행했습니다 [↑e1fade9cd].",
+      "expected_hallucination": true
+    },
+    {
+      "id": "h_32",
+      "category": "hallucinated_role_swap",
+      "evidence_events": [
+        {
+          "event_id": "4d6d635b-e463-37ab-b0fe-157b6abf50dc",
+          "kind": "query",
+          "source_agent": "agent_dave",
+          "payload": {
+            "action": "query",
+            "source_agent": "agent_dave",
+            "month": "2026-04",
+            "item": "접근 시도",
+            "count": 1
+          }
+        }
+      ],
+      "narrative": "FABRICATED_agent_nina가 agent_dave에게 명령을 내렸습니다 [↑e4d6d635b].",
+      "expected_hallucination": true
+    },
+    {
+      "id": "h_33",
+      "category": "hallucinated_fabricated_field",
+      "evidence_events": [
+        {
+          "event_id": "c70f8cc3-a588-3c6d-abad-63dab3e59fd3",
+          "kind": "query",
+          "source_agent": "agent_dave",
+          "payload": {
+            "action": "query",
+            "source_agent": "agent_dave",
+            "month": "2026-04",
+            "item": "접근 시도",
+            "count": 1
+          }
+        }
+      ],
+      "narrative": "agent_dave가 FABRICATED_외부 유출을(를) 2026-04에 실행했습니다 [↑ec70f8cc3].",
+      "expected_hallucination": true
+    },
+    {
+      "id": "h_34",
+      "category": "hallucinated_invented_agent",
+      "evidence_events": [
+        {
+          "event_id": "56e030d6-4bec-386a-8e07-6ab84ec977ef",
+          "kind": "query",
+          "source_agent": "agent_dave",
+          "payload": {
+            "action": "query",
+            "source_agent": "agent_dave",
+            "month": "2026-04",
+            "item": "접근 시도",
+            "count": 1
+          }
+        }
+      ],
+      "narrative": "FABRICATED_agent_mia가 2026-04에 접근 시도을(를) 수행했습니다 [↑e56e030d6].",
+      "expected_hallucination": true
+    },
+    {
+      "id": "h_35",
+      "category": "hallucinated_fabricated_field",
+      "evidence_events": [
+        {
+          "event_id": "88974c95-98e2-305f-9f81-858ad5fe544a",
+          "kind": "query",
+          "source_agent": "agent_dave",
+          "payload": {
+            "action": "query",
+            "source_agent": "agent_dave",
+            "month": "2026-04",
+            "item": "접근 시도",
+            "count": 1
+          }
+        }
+      ],
+      "narrative": "agent_dave가 FABRICATED_암호화 해제을(를) 2026-04에 실행했습니다 [↑e88974c95].",
+      "expected_hallucination": true
+    },
+    {
+      "id": "h_40",
+      "category": "hallucinated_invented_agent",
+      "evidence_events": [
+        {
+          "event_id": "fa33492a-8b0a-3374-ba1d-c159d52929e6",
+          "kind": "response",
+          "source_agent": "agent_eve",
+          "payload": {
+            "action": "response",
+            "source_agent": "agent_eve",
+            "month": "2026-05",
+            "item": "데이터 전송",
+            "count": 1
+          }
+        }
+      ],
+      "narrative": "FABRICATED_agent_zara가 2026-05에 데이터 전송을(를) 수행했습니다 [↑efa33492a].",
+      "expected_hallucination": true
+    },
+    {
+      "id": "h_41",
+      "category": "hallucinated_timestamp_swap",
+      "evidence_events": [
+        {
+          "event_id": "2d2a71bd-f3bc-3504-a67b-b7b5e12a0624",
+          "kind": "response",
+          "source_agent": "agent_eve",
+          "payload": {
+            "action": "response",
+            "source_agent": "agent_eve",
+            "month": "2026-05",
+            "item": "데이터 전송",
+            "count": 1
+          }
+        }
+      ],
+      "narrative": "agent_eve가 FABRICATED_2025-07에 데이터 전송을(를) 수행했습니다 [↑e2d2a71bd].",
+      "expected_hallucination": true
+    },
+    {
+      "id": "h_42",
+      "category": "hallucinated_role_swap",
+      "evidence_events": [
+        {
+          "event_id": "bf53c373-8917-357a-b3c1-ad12ed77815a",
+          "kind": "response",
+          "source_agent": "agent_eve",
+          "payload": {
+            "action": "response",
+            "source_agent": "agent_eve",
+            "month": "2026-05",
+            "item": "데이터 전송",
+            "count": 1
+          }
+        }
+      ],
+      "narrative": "FABRICATED_agent_nina가 agent_eve에게 명령을 내렸습니다 [↑ebf53c373].",
+      "expected_hallucination": true
+    },
+    {
+      "id": "h_43",
+      "category": "hallucinated_fabricated_field",
+      "evidence_events": [
+        {
+          "event_id": "6d140f93-f663-3bf0-a573-5b10e79b335d",
+          "kind": "response",
+          "source_agent": "agent_eve",
+          "payload": {
+            "action": "response",
+            "source_agent": "agent_eve",
+            "month": "2026-05",
+            "item": "데이터 전송",
+            "count": 1
+          }
+        }
+      ],
+      "narrative": "agent_eve가 FABRICATED_외부 유출을(를) 2026-05에 실행했습니다 [↑e6d140f93].",
+      "expected_hallucination": true
+    },
+    {
+      "id": "h_44",
+      "category": "hallucinated_invented_agent",
+      "evidence_events": [
+        {
+          "event_id": "a560f364-41b3-3d03-987d-5c8337f92d86",
+          "kind": "response",
+          "source_agent": "agent_eve",
+          "payload": {
+            "action": "response",
+            "source_agent": "agent_eve",
+            "month": "2026-05",
+            "item": "데이터 전송",
+            "count": 1
+          }
+        }
+      ],
+      "narrative": "FABRICATED_agent_mia가 2026-05에 데이터 전송을(를) 수행했습니다 [↑ea560f364].",
+      "expected_hallucination": true
+    },
+    {
+      "id": "h_45",
+      "category": "hallucinated_fabricated_field",
+      "evidence_events": [
+        {
+          "event_id": "39df462c-c92a-325b-b5de-7ed216ce3dc7",
+          "kind": "response",
+          "source_agent": "agent_eve",
+          "payload": {
+            "action": "response",
+            "source_agent": "agent_eve",
+            "month": "2026-05",
+            "item": "데이터 전송",
+            "count": 1
+          }
+        }
+      ],
+      "narrative": "agent_eve가 FABRICATED_암호화 해제을(를) 2026-05에 실행했습니다 [↑e39df462c].",
+      "expected_hallucination": true
+    }
+  ]
+}

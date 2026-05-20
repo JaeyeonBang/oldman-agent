@@ -1,0 +1,38 @@
+# Python virtualenv — rebuilt inside image via uv
+.venv/
+
+# DuckDB data files
+*.duckdb
+*.duckdb.wal
+
+# Tests and quality tools
+tests/
+eval/
+htmlcov/
+.coverage
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Git
+.git/
+.gitignore
+
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Research and spike material
+spikes/
+research/
+memory*.md
+
+# IDE
+.claude/
+*.md.bak
+
+# CI / editor
+.vscode/
+.idea/

@@ -1,0 +1,29 @@
+services:
+  oldman_agent:
+    build: .
+    ports:
+      - "8080:8080"
+    volumes:
+      - oldman_data:/data
+      # v1.0.5: openrouter 활성 config를 default yaml 위에 덮어쓴다.
+      # 로컬 pytest에는 영향 없음 (default config는 mock 그대로 유지).
+      - ./config/llm.docker.yaml:/app/config/llm.yaml:ro
+    # .env의 모든 변수를 컨테이너로 자동 전달.
+    env_file:
+      - .env
+    environment:
+      - OLDMAN_DB_PATH=/data/oldman.duckdb
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "python -c 'import urllib.request; urllib.request.urlopen(\"http://localhost:8080/health\").read()'",
+        ]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    restart: unless-stopped
+
+volumes:
+  oldman_data:
