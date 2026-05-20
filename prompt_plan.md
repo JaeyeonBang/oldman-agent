@@ -1991,3 +1991,393 @@ def load_narrative_prompt(persona: str | None = None) -> str:
 - `pre-commit install` actual one-time setup — document only
 - GitHub Actions actual remote run — can't verify without push
 
+
+---
+
+# Implementation Plan: oldman_agent v2 — A2A messaging compliance
+
+Generated 2026-05-21 by Opus. Source PRD: `.claude/prds/oldman-agent-v2.prd.md`. Architecture: `ARCHITECTURE.md`.
+
+**Status**: **DRAFT → SELF-LOCKED** (user direction: "Messaging까지 진짜 A2A 준수, ... PRD부터 plan, 아키텍쳐 다 작성하고, 최종 plan이 A2A준수하는 지 확인해").
+
+**Predecessors**: v1.0.6 shipped (250 tests, 94% cov, Docker E2E 9/9, GitHub `JaeyeonBang/oldman-agent` public). v2 is **additive** — adds JSON-RPC + AgentExecutor surface, deprecates non-A2A HTTP routes.
+
+## 1. Scope (mandatory)
+
+Per PRD v2 §2, ship these eight commitments:
+1. Inbound messaging via A2A v0.3 JSON-RPC over HTTP single endpoint
+2. `OldmanAgentExecutor(AgentExecutor)` implementation
+3. Real Task lifecycle (submitted/working/completed/canceled/failed)
+4. Standard Message + Part envelope (TextPart + DataPart + metadata.oldman.intent)
+5. SSE streaming via `message/stream` for query
+6. Discovery at `/.well-known/agent-card.json`
+7. Compliance test using real `a2a.client.create_client()`
+8. Live URL deployment (Fly.io) with `AgentCard.url` pointing there
+
+Per PRD v2 §3, **out of scope**: push notifications, persistent TaskStore, multi-turn context, OAuth, gRPC, removing legacy HTTP routes (those go to v2.1).
+
+## 2. Risks & Open Decisions
+
+| # | Decision | Recommended call |
+|---|---|---|
+| 8.1 | TaskStore choice | **In-memory** (SDK default). Persistent → v2.1. 5-20 agent demo scale OK with in-memory. |
+| 8.2 | JSON-RPC endpoint path | **`/`** — root. AgentCard.url = base URL = endpoint. Matches SDK default. |
+| 8.3 | Discovery path | **`/.well-known/agent-card.json`** (SDK default in A2ACardResolver). Keep `/agent-card` as alias for backward compat. |
+| 8.4 | Intent metadata key | **`oldman.intent`** under `message.metadata`. Reverse-DNS style avoids collision with other agents' extensions. |
+| 8.5 | Heuristic for missing intent | TextPart present + no DataPart → assume `query`. DataPart-only without intent → fail with helpful error directing to skill docs. |
+| 8.6 | Legacy `/publish` `/query` routes | **Keep as deprecated thin wrappers** that translate to AgentExecutor internally. Remove in v2.1 after one dogfood cycle. dogfood_smoke.sh stays green. |
+| 8.7 | Backward compat for existing pytest | All 250+ tests must keep passing. New tests cover A2A path. Some integration tests may be **rewritten** to use A2A client (preferred over keeping 2 paths in sync). |
+| 8.8 | Reflection scheduler hook | **Unchanged** — still BackgroundTasks after publish commit. AgentExecutor calls into existing publish logic which already schedules. |
+| 8.9 | URL env var for AgentCard.url | **`OLDMAN_BASE_URL`** (already added in earlier discussion). Default `http://localhost:8080` for local. |
+| 8.10 | Streaming chunking | v2.0: emit `working` event then full TextPart at completion (not per-token). Token-level streaming via SDK's text-streaming helpers → v2.1. Simpler implementation, real client can still observe lifecycle progress. |
+| 8.11 | `cancel()` semantics | Cancel underlying asyncio task running narrative render. If publish path (instant-complete) — cancel is no-op (already done). Document this. |
+| 8.12 | `tasks/resubscribe` | SDK handles routing; we just need TaskStore to keep terminated tasks for a brief window so resubscribe finds final state. SDK default behavior should be sufficient. |
+| 8.13 | Dependency: `a2a-sdk[http-server]` | Add `starlette` (already pulled by SDK install) + `sse-starlette` (added v1.0.5 effort). Confirm `a2a-sdk[http-server]` extras pin. |
+
+## 3. Implementation Phases
+
+### Phase 8.0 — Dependencies + bootstrap surface (S, ~0.3h)
+
+**Files**:
+- `pyproject.toml` — bump `a2a-sdk` extras to `a2a-sdk[http-server]>=1.0,<2.0`; ensure `sse-starlette>=3.0` listed
+- `tests/conftest.py` — no change; new A2A test fixtures live in `tests/integration/test_a2a_compliance.py`
+
+**Acceptance**: `uv pip install -e ".[dev]"` succeeds; `python -c "from a2a.server.routes.jsonrpc_routes import create_jsonrpc_routes; print('ok')"` works.
+
+### Phase 8.1 — `app/a2a/intents.py` (S, ~0.3h)
+
+**Files**: `app/a2a/__init__.py`, `app/a2a/intents.py`, `tests/unit/test_a2a_intents.py`
+
+**Module contents**:
+```python
+INTENT_PUBLISH = "publish"
+INTENT_QUERY = "query"
+INTENT_METADATA_KEY = "oldman.intent"
+
+def extract_intent(message) -> str | None:
+    """Return oldman intent from message.metadata, or None."""
+
+def heuristic_intent(message) -> str | None:
+    """If intent missing: TextPart only → 'query'; else None."""
+
+def get_data_part(message) -> dict | None: ...
+def get_text(message) -> str: ...  # delegate to a2a.utils helpers
+```
+
+**TDD (RED first)**:
+- `test_extract_intent_returns_publish_when_metadata_set`
+- `test_extract_intent_returns_none_when_metadata_absent`
+- `test_heuristic_falls_back_to_query_on_text_only`
+- `test_heuristic_returns_none_when_data_present_but_no_intent`
+- `test_get_data_part_extracts_dict`
+- `test_get_text_extracts_concatenated_text`
+
+### Phase 8.2 — `app/a2a/task_emitter.py` (S, ~0.4h)
+
+**Files**: `app/a2a/task_emitter.py`, `tests/unit/test_task_emitter.py`
+
+**Module contents**:
+```python
+async def emit_submitted(queue, task_id, context_id) -> None
+async def emit_working(queue, task_id, context_id, message_hint: str | None = None) -> None
+async def emit_artifact(queue, task_id, context_id, *, text: str, data: dict) -> None
+async def emit_completed(queue, task_id, context_id) -> None
+async def emit_failed(queue, task_id, context_id, error_message: str) -> None
+async def emit_canceled(queue, task_id, context_id) -> None
+```
+
+All wrap `a2a.compat.v0_3.types.TaskStatusUpdateEvent / TaskArtifactUpdateEvent / Task` and call `queue.enqueue_event(...)`.
+
+**TDD**:
+- Each emit_* function tested with a fake EventQueue (collects events into a list); assert exact event type + fields enqueued.
+
+### Phase 8.3 — `OldmanAgentExecutor` (M, ~1.2h, highest risk)
+
+**Files**: `app/a2a/executor.py`, `tests/unit/test_executor_dispatch.py`, `tests/integration/test_executor_query_lifecycle.py`
+
+**Class**:
+```python
+class OldmanAgentExecutor(AgentExecutor):
+    def __init__(
+        self,
+        conn,                        # duckdb conn
+        narrative_provider,
+        reflection_provider,
+        judge_provider,
+        settings,
+        background_tasks_runner,     # callable that schedules reflection after publish
+    ): ...
+
+    async def execute(self, context, event_queue) -> None:
+        intent = extract_intent(context.message) or heuristic_intent(context.message)
+        if intent == INTENT_PUBLISH:
+            await self._dispatch_publish(context, event_queue)
+        elif intent == INTENT_QUERY:
+            await self._dispatch_query(context, event_queue)
+        else:
+            await emit_failed(event_queue, ..., "missing oldman.intent metadata")
+
+    async def cancel(self, context, event_queue) -> None: ...
+
+    async def _dispatch_publish(self, context, event_queue) -> None:
+        # parse DataPart → call existing publish logic (validate, dedup, insert TX)
+        # then emit submitted + completed (instant) with ack Message
+        # also schedule background reflection (same as current /publish path)
+
+    async def _dispatch_query(self, context, event_queue) -> None:
+        # parse text + DataPart filters
+        # emit submitted, working
+        # call render_narrative(...)
+        # emit artifact (TextPart narrative + DataPart citations metadata)
+        # emit completed
+```
+
+**TDD (RED first)**:
+- `test_execute_unknown_intent_emits_failed_with_helpful_message`
+- `test_execute_publish_intent_persists_event_and_emits_completed`
+- `test_execute_publish_with_blocklisted_kind_emits_failed`
+- `test_execute_publish_with_jaccard_dup_emits_completed_with_deduplicated_status`
+- `test_execute_query_intent_emits_lifecycle_submitted_working_completed`
+- `test_execute_query_with_no_evidence_emits_completed_with_fallback`
+- `test_execute_query_with_strict_mode_calls_judge`
+- `test_execute_heuristic_text_only_treats_as_query`
+- `test_cancel_query_emits_canceled_status`
+
+### Phase 8.4 — Route wiring + `/.well-known/agent-card.json` (S, ~0.5h)
+
+**Files**: `app/a2a/routes.py`, `app/main.py` (extend)
+
+**routes.py**:
+```python
+def build_a2a_routes(executor, agent_card) -> list[Route]:
+    """Returns Starlette routes for JSON-RPC + well-known card."""
+    handler = DefaultRequestHandlerV2(
+        agent_executor=executor,
+        task_store=InMemoryTaskStore(),
+        agent_card=agent_card,
+    )
+    jsonrpc = create_jsonrpc_routes(handler, rpc_url="/")
+    well_known = Route(
+        "/.well-known/agent-card.json",
+        endpoint=lambda request: JSONResponse(agent_card.model_dump(by_alias=True)),
+        methods=["GET"],
+    )
+    return [*jsonrpc, well_known]
+```
+
+**main.py changes**:
+- Build `OldmanAgentExecutor` from `app.state` (conn, providers, settings)
+- Construct AgentCard with `url=os.environ.get("OLDMAN_BASE_URL", "http://localhost:8080")`
+- Mount `build_a2a_routes(...)` via `app.routes.extend(...)` or `app.add_route(...)`
+- Keep existing `/health`, `/agent-card`, `/publish`, `/query` for backward compat
+
+**Tests**: covered by Phase 8.6 compliance suite.
+
+### Phase 8.5 — AgentCard updates (S, ~0.3h)
+
+**Files**: `app/api/agent_card.py`
+
+- `url` reads from `OLDMAN_BASE_URL` env (default `http://localhost:8080`)
+- `capabilities.streaming = True` (we now support `message/stream`)
+- Skill descriptions updated to document `metadata.oldman.intent` contract:
+  - `publish_event` description includes "Send via `message/send` with `metadata.oldman.intent='publish'` and a DataPart containing event_kind/source_agent/observed_agent/payload."
+  - `narrative_query` description includes "Send via `message/send` or `message/stream` with `metadata.oldman.intent='query'`, TextPart for the question, optional DataPart for filters (subject_agent, max_citations, strict_mode)."
+
+**Tests (extend `test_agent_card.py`)**:
+- `test_agent_card_url_from_env`
+- `test_agent_card_streaming_capability_true`
+- `test_skill_descriptions_document_intent_contract`
+
+### Phase 8.6 — A2A compliance test suite (M, ~1.0h)
+
+**File**: `tests/integration/test_a2a_compliance.py`
+
+Uses real `a2a.client` against in-process ASGI app. Implements C1-C5 from PRD §4:
+
+```python
+@pytest_asyncio.fixture
+async def a2a_client_pair(async_client):
+    """Returns (resolver, client) wired against in-process app."""
+    # Use httpx.AsyncClient with our app as ASGI transport
+    # A2ACardResolver(httpx_client, base_url="http://test")
+    # get_agent_card() → use to create_client()
+
+async def test_c1_card_validates_against_sdk_schema(a2a_client_pair): ...
+async def test_c2_publish_intent_via_message_send(a2a_client_pair): ...
+async def test_c3_query_lifecycle_submitted_working_completed(a2a_client_pair): ...
+async def test_c4_message_stream_emits_status_artifact_completed(a2a_client_pair): ...
+async def test_c5_cancel_during_query_yields_canceled_state(a2a_client_pair): ...
+```
+
+All tests use **MockProvider** for LLM (no real API in pytest).
+
+### Phase 8.7 — Deprecated `/publish` `/query` thin wrappers (S, ~0.4h)
+
+**Files**: `app/api/publish.py`, `app/api/query.py` (modify, don't delete)
+
+Keep route signatures identical (backward compat) but **internally** translate to AgentExecutor:
+```python
+@router.post("/publish", response_model=PublishResponse)
+async def publish(req: PublishRequest, request: Request) -> PublishResponse:
+    # build A2A Message from PublishRequest fields
+    msg = Message(role="user", message_id=str(uuid.uuid4()),
+                  metadata={"oldman.intent": "publish"},
+                  parts=[Part(root=DataPart(data=req.model_dump(mode="json")))])
+    # call executor directly
+    result = await _execute_and_collect(request.app.state.a2a_executor, msg)
+    # unwrap result → PublishResponse
+```
+
+Adds a deprecation warning header: `Deprecation: A2A-replacement; use POST / with method=message/send`.
+
+**Tests**: existing `tests/integration/test_publish.py` + `tests/integration/test_query.py` keep passing without changes (semantics preserved).
+
+### Phase 8.8 — Smoke + docs (S, ~0.4h)
+
+**Files**:
+- `scripts/dogfood_smoke.sh` — extend with a `--a2a` mode that uses SDK client; keep legacy mode as default for backward compat
+- `scripts/dummy_a2a_client.py` — new; standalone SDK client demo (discovery + publish + query) that runs against any URL
+- `README.md` — section "A2A protocol surface" replacing the misleading v1 paragraphs; reference ARCHITECTURE.md
+- `DESIGN_NOTES.md` — append "v2 — closing the A2A compliance debt" (per PRD §8)
+- `TODOS.md` — flip v2 boxes, document v2.1 backlog (push notifications, persistent task store)
+- `pyproject.toml` — version bump `0.1.2a0 → 0.2.0a0`
+- `app/__init__.py` — `__version__ = "0.2.0a0"`
+
+### Phase 8.9 — Fly.io deployment (S, ~0.5h)
+
+**Files**: `fly.toml` (new), `Dockerfile` (no change; reuse v1.0.5 build), `scripts/deploy_fly.sh` (new)
+
+**Steps**:
+1. `fly launch --no-deploy` → generate `fly.toml`
+2. Edit `fly.toml`:
+   - `[env]` `OLDMAN_DB_PATH = "/data/oldman.duckdb"`, `OLDMAN_BASE_URL = "https://<app-name>.fly.dev"`
+   - `[[mounts]]` volume → `/data`
+3. `fly volumes create oldman_data --size 1`
+4. `fly secrets set OPENROUTER_API_KEY=... OPENROUTER_DEFAULT_MODEL=deepseek/deepseek-chat-v3.1`
+5. `fly deploy`
+6. Post-deploy smoke (new `scripts/post_deploy_verify.sh`):
+   - `curl https://<app>.fly.dev/.well-known/agent-card.json` → parse, assert `url` matches deploy URL
+   - `python scripts/dummy_a2a_client.py https://<app>.fly.dev` → publish + query round-trip via SDK client
+   - Output: "✓ deployed A2A agent reachable + spec-compliant"
+
+## 4. Schema delta
+
+**No DB schema changes.** TaskStore is in-memory.
+
+## 5. API Surface (v2)
+
+| URL | Method | Spec | Status |
+|---|---|---|---|
+| `POST /` | JSON-RPC 2.0 (`message/send`, `message/stream`, `tasks/get`, `tasks/cancel`, `tasks/resubscribe`) | A2A v0.3 | **NEW (v2)** |
+| `GET /.well-known/agent-card.json` | A2A v0.3 AgentCard | A2A v0.3 | **NEW (v2)** |
+| `GET /agent-card` | A2A v0.3 AgentCard (alias) | — | Existing, kept |
+| `POST /publish` | custom JSON (M1 shape) | — | **Deprecated** — internal wrapper around executor |
+| `POST /query` | custom JSON (M3 shape) | — | **Deprecated** — internal wrapper |
+| `GET /health` | `{status: "ok"}` | — | Existing, kept |
+
+## 6. Test Plan
+
+| Layer | New/Modified | Coverage target |
+|---|---|---|
+| Unit (`app/a2a/intents.py`) | new | 100% |
+| Unit (`app/a2a/task_emitter.py`) | new | 100% |
+| Unit (`app/a2a/executor.py`) | new | ≥ 90% |
+| Integration (executor lifecycle) | new | full happy + 3 error paths |
+| **Integration (A2A compliance, real SDK client)** | new | C1-C5 all PASS |
+| Integration (test_publish.py, test_query.py) | unchanged tests; pass via deprecated wrappers | green |
+| EVAL-1 / EVAL-2 | unchanged | PASS |
+| ruff / mypy --strict | extended to `app/a2a/` | clean |
+
+**No real API call in pytest** (all MockProvider).
+
+## 7. Acceptance Criteria
+
+- [ ] All 250+ existing pytest cases pass
+- [ ] New A2A unit + integration tests pass (~25 new tests)
+- [ ] **All 5 compliance gates (C1-C5) green** — `test_a2a_compliance.py` passes
+- [ ] Coverage ≥ 90% on `app/a2a/`, overall ≥ 85%
+- [ ] ruff + mypy --strict clean
+- [ ] EVAL-1 mock 0.717+, EVAL-2 mock 0.00% hallucination
+- [ ] `docker compose up -d --build` boots; both deprecated routes + new `/` JSON-RPC respond
+- [ ] `python scripts/dummy_a2a_client.py http://localhost:8080` works against local container
+- [ ] Fly.io deploy succeeds; `https://<app>.fly.dev/.well-known/agent-card.json` returns valid card; `python scripts/dummy_a2a_client.py https://<app>.fly.dev` completes publish + query round-trip
+- [ ] README, ARCHITECTURE.md, DESIGN_NOTES.md updated
+
+## 8. Effort Estimate
+
+| Phase | Hours |
+|---|---|
+| 8.0 deps + bootstrap | 0.3 |
+| 8.1 intents module | 0.3 |
+| 8.2 task_emitter | 0.4 |
+| 8.3 OldmanAgentExecutor (biggest) | 1.2 |
+| 8.4 route wiring + .well-known | 0.5 |
+| 8.5 AgentCard updates | 0.3 |
+| 8.6 A2A compliance test suite | 1.0 |
+| 8.7 deprecated wrappers | 0.4 |
+| 8.8 smoke + docs | 0.4 |
+| 8.9 Fly.io deploy | 0.5 |
+| Buffer | 0.7 |
+| **Total** | **6.0 h** |
+
+Above 5h cap by 1h — accepted, justification: this closes the central technical debt of the project.
+
+## 9. Compliance verification (audit against PRD v2 §4 + SDK)
+
+| PRD requirement | Plan phase | SDK construct used | Verified? |
+|---|---|---|---|
+| C1 — Card validates via SDK type | 8.5 + 8.6 | `a2a.compat.v0_3.types.AgentCard.model_validate()` | yes (existing v1.0.1 test extended) |
+| C2 — Client round-trip publish | 8.3 + 8.6 | `a2a.client.create_client()` + `A2ACardResolver` | yes (new test_c2) |
+| C3 — Query Task lifecycle | 8.3 + 8.6 | `TaskState.submitted/working/completed`, `tasks/get` | yes (new test_c3) |
+| C4 — SSE streaming | 8.3 + 8.6 | `message/stream` JSON-RPC, `TaskStatusUpdateEvent`, `TaskArtifactUpdateEvent` | yes (new test_c4) |
+| C5 — Cancel | 8.3 + 8.6 | `tasks/cancel`, `TaskState.canceled` | yes (new test_c5) |
+| Wire methods complete | 8.4 | `create_jsonrpc_routes()` mounts all 5 v0.3 methods | yes |
+| AgentExecutor implemented | 8.3 | `AgentExecutor.execute() + cancel()` | yes |
+| Discovery at standard path | 8.4 | `/.well-known/agent-card.json` matches SDK A2ACardResolver default | yes |
+| Deployment | 8.9 | `OLDMAN_BASE_URL` env → `AgentCard.url` | yes |
+| Backward compat | 8.7 | deprecated wrappers preserve 250+ tests | yes |
+
+All PRD §4 gates have a plan phase. All SDK constructs identified are confirmed real (Phase: SDK inspection done before this plan).
+
+## 10. Out of scope (v2.0 — explicit per PRD §3)
+
+- Push notifications → v2.1
+- Persistent TaskStore (DuckDB-backed) → v2.1
+- `tasks/resubscribe` after server restart → v2.1
+- Multi-turn context_id reuse → v3
+- OAuth → v1.5 (with x402)
+- gRPC → v3
+- Remove legacy `/publish` `/query` → v2.1
+
+## 11. Files added/modified (forecast)
+
+**New** (~12 files):
+- `.claude/prds/oldman-agent-v2.prd.md` (already done)
+- `ARCHITECTURE.md` (already done)
+- `app/a2a/__init__.py`
+- `app/a2a/intents.py`
+- `app/a2a/task_emitter.py`
+- `app/a2a/executor.py`
+- `app/a2a/routes.py`
+- `tests/unit/test_a2a_intents.py`
+- `tests/unit/test_task_emitter.py`
+- `tests/unit/test_executor_dispatch.py`
+- `tests/integration/test_executor_query_lifecycle.py`
+- `tests/integration/test_a2a_compliance.py`
+- `scripts/dummy_a2a_client.py`
+- `scripts/post_deploy_verify.sh`
+- `fly.toml`
+
+**Modified**:
+- `pyproject.toml` (deps + version bump)
+- `app/main.py` (mount A2A routes + executor wiring)
+- `app/bootstrap.py` (build executor)
+- `app/api/agent_card.py` (url from env, streaming=true, skill descriptions)
+- `app/api/publish.py` `app/api/query.py` (deprecated wrappers)
+- `app/__init__.py` (version)
+- `tests/unit/test_agent_card.py` (extend)
+- `scripts/dogfood_smoke.sh` (add --a2a mode)
+- `README.md` (A2A section rewrite)
+- `DESIGN_NOTES.md` (debt-resolution section)
+- `TODOS.md` (v2 closed, v2.1 backlog)
+

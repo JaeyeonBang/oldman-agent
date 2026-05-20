@@ -1,7 +1,7 @@
 [project]
 name = "oldman-agent"
-version = "0.1.2a0"
-description = "꼰대 정보통 — A2A 에이전트 생태계의 메타-기록자 (M1 surface)"
+version = "0.2.0a0"
+description = "꼰대 정보통 — A2A 에이전트 생태계의 메타-기록자 (A2A v0.3 compliant)"
 readme = "README.md"
 requires-python = ">=3.11"
 dependencies = [

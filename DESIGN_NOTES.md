@@ -325,3 +325,56 @@ Bootstrap은 tier 이름 → mode 매핑을 `_build_provider` 내부에서 처�
 - `test_full_pipeline_with_smart_mock_no_keys` — 10 publish → reflection landing → /query citations, no API keys
 - `.github/workflows/ci.yml` + `.pre-commit-config.yaml` 유효 YAML 확인
 - `OLDMAN_PERSONA=kkondae` env로 페르소나 즉시 전환 가능
+
+---
+
+## v2 — closing the A2A compliance debt (2026-05-21)
+
+### 1. v1 misleading deferral 인정
+
+v1은 자신을 "A2A 에이전트"로 광고하면서 실제로는:
+- `a2a-sdk`를 AgentCard **타입 검증 1개 기능만** 사용
+- `POST /publish` + `POST /query`는 **custom HTTP API** — JSON-RPC 2.0 envelope 없음,
+  Task lifecycle 없음, `message/send` 메서드 없음, SSE 없음
+- → 표준 A2A 클라이언트 (`a2a.client.create_client()`)는 우리 카드만 읽을 수 있고
+  publish/query 호출 불가
+
+v1 PRD는 이를 "semantic mismatch (Task lifecycle vs publish webhook)"로 명명하고
+deferral 처리했다. **이는 false advertising이었다.**
+
+### 2. semantic-mismatch 해소 — intent dispatch
+
+v2는 표준 A2A `message/send` 위에 **intent-based dispatch**를 얹는다:
+
+- `message.metadata["oldman.intent"] = "publish" | "query"` 로 동작 분기
+- `publish`: instant-complete Task (`submitted → completed` + ack artifact)
+- `query`: 정상 lifecycle (`submitted → working → completed` + narrative artifact)
+- 미설정 시: TextPart only → heuristic = query / 그 외 → failed (helpful error)
+
+AgentCard skill description에 이 contract를 명시.
+
+### 3. v2.0 ships / v2.1 leaves
+
+**v2.0 ships**:
+- `OldmanAgentExecutor` (a2a.server.agent_execution.AgentExecutor 서브클래스)
+- JSON-RPC routes: `message/send`, `message/stream`, `tasks/get`, `tasks/cancel`,
+  `tasks/resubscribe` (모두 `enable_v0_3_compat=True` SDK 활용)
+- `GET /.well-known/agent-card.json` (SDK-standard discovery path)
+- `AgentCard.url` = `OLDMAN_BASE_URL` env (배포 시 `https://<app>.fly.dev`)
+- `capabilities.streaming = True`
+- C1-C5 compliance suite green (`tests/integration/test_a2a_compliance.py`)
+- 기존 `/publish` `/query` 는 deprecated wrapper로 유지 (Deprecation 헤더 부착)
+- 도메인 로직 분리: `execute_publish()` / `execute_query()` — wrapper와 executor가 공유
+
+**v2.1 defers**:
+- `tasks/pushNotificationConfig/*` (webhook) — 작업이 < 30초면 불필요
+- 영속 TaskStore (DuckDB-backed) — 5-20 agent demo scale에서는 in-memory 충분
+- 재시작 후 `tasks/resubscribe` — 영속 TaskStore에 종속
+
+### 4. 영수증
+
+- 250 → 278 tests GREEN (+28, 92% coverage)
+- ruff + mypy --strict clean
+- EVAL-1 mock 0.717 / EVAL-2 mock 0 hallucination
+- C1-C5 all PASS
+- 배포는 `fly.toml` + `scripts/deploy_fly.sh` + `scripts/post_deploy_verify.sh` 준비됨

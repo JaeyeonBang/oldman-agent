@@ -1,0 +1,43 @@
+# fly.toml — oldman_agent A2A v0.3 deployment
+#
+# Single-instance topology. DuckDB single-writer requires workers=1 and a
+# persisted volume at /data. Adjust app name + region to taste before deploy.
+#
+# Deploy:
+#   fly secrets set OPENROUTER_API_KEY=... OPENROUTER_DEFAULT_MODEL=...
+#   fly volumes create oldman_data --size 1
+#   fly deploy
+#   curl https://<app>.fly.dev/.well-known/agent-card.json
+#   python scripts/dummy_a2a_client.py https://<app>.fly.dev
+
+app = "oldman-agent"
+primary_region = "nrt"
+
+[build]
+  dockerfile = "Dockerfile"
+
+[env]
+  OLDMAN_DB_PATH = "/data/oldman.duckdb"
+  OLDMAN_BASE_URL = "https://oldman-agent.fly.dev"
+  OLDMAN_LOG_LEVEL = "INFO"
+
+[[mounts]]
+  source = "oldman_data"
+  destination = "/data"
+
+[http_service]
+  internal_port = 8080
+  force_https = true
+  auto_stop_machines = "stop"
+  auto_start_machines = true
+  min_machines_running = 1
+  processes = ["app"]
+
+[[vm]]
+  cpu_kind = "shared"
+  cpus = 1
+  memory_mb = 512
+
+# Single uvicorn worker — DuckDB single-writer invariant
+[processes]
+  app = "uvicorn app.main:create_app --factory --host 0.0.0.0 --port 8080 --workers 1"

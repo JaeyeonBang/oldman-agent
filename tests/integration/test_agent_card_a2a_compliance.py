@@ -44,7 +44,7 @@ async def test_agent_card_validates_against_a2a_v0_2_schema(async_client: AsyncC
     # vendor extension survives in the raw dict (SDK strips it; that's fine)
     assert "x-oldman" in raw
     assert raw["x-oldman"]["persona"] == "꼰대 정보통"
-    assert raw["x-oldman"]["protocol_version_target"] == "0.2"
+    assert raw["x-oldman"]["protocol_version_target"] == "0.3"  # v2 bump
 
 
 @pytest.mark.asyncio

@@ -15,16 +15,17 @@
                                               ▼
                                     200 QueryResponse
 
-M4: strict_mode=True(기본)이면 app.state.judge_provider를 주입.
-    judge_provider 미설정 시 existence-only로 downgrade (경고 로그).
+v2: ``execute_query()`` core extracted as a callable so both the deprecated
+``/query`` route and the A2A AgentExecutor invoke the same render path.
 """
 
 from __future__ import annotations
 
 import logging
-from typing import Literal
+from typing import Any, Literal
 
-from fastapi import APIRouter, HTTPException, Request, status
+import duckdb
+from fastapi import APIRouter, HTTPException, Request, Response, status
 
 from app.api.schemas import QueryRequest, QueryResponse
 from app.narrative.renderer import render_narrative
@@ -34,35 +35,25 @@ _LOG = logging.getLogger(__name__)
 router = APIRouter()
 
 
-@router.post("/query", response_model=QueryResponse)
-async def query(req: QueryRequest, request: Request) -> QueryResponse:
-    """에이전트 행적 또는 소사이어티 동향을 내러티브로 반환한다.
+class ProviderUnavailableError(Exception):
+    """Raised when narrative_provider is not configured."""
 
-    - ``narrative_provider`` 가 ``app.state`` 에 없으면 503.
-    - DB가 cold-start 상태 (이벤트·reflection 없음)이면 fallback 메시지 반환.
-    - 인용 검증 실패 시 최대 2회 재시도 후 fallback.
-    - ``strict_mode=True`` (기본)이면 LLM judge 기반 내용 검증.
-      judge_provider 미설정 시 existence-only로 downgrade.
+
+async def execute_query(
+    conn: duckdb.DuckDBPyConnection,
+    narrative_provider: Any,
+    req: QueryRequest,
+    *,
+    judge_provider: Any = None,
+) -> QueryResponse:
+    """Core query flow. Validates, runs renderer, applies strict-mode judge.
+
+    Raises:
+        ProviderUnavailableError if narrative_provider is None.
     """
-    conn = request.app.state.db
-    provider = getattr(request.app.state, "narrative_provider", None)
+    if narrative_provider is None:
+        raise ProviderUnavailableError("narrative_provider_unconfigured")
 
-    if provider is None:
-        raise HTTPException(
-            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail={
-                "status": "unavailable",
-                "reason": "narrative_provider_unconfigured",
-            },
-        )
-
-    # judge provider 결정: judge_provider → reflection_provider → None
-    judge_provider = (
-        getattr(request.app.state, "judge_provider", None)
-        or getattr(request.app.state, "reflection_provider", None)
-    )
-
-    # strict_mode 결정
     validator_mode: Literal["existence", "strict"]
     if req.strict_mode and judge_provider is None:
         _LOG.warning(
@@ -76,7 +67,7 @@ async def query(req: QueryRequest, request: Request) -> QueryResponse:
 
     result = await render_narrative(
         conn,
-        provider,
+        narrative_provider,
         req.question,
         req.subject_agent,
         max_retries=2,
@@ -90,4 +81,40 @@ async def query(req: QueryRequest, request: Request) -> QueryResponse:
         is_cold_start=result.is_cold_start,
         retries_used=result.retries_used,
         used_fallback=result.used_fallback,
+    )
+
+
+@router.post("/query", response_model=QueryResponse)
+async def query(
+    req: QueryRequest, request: Request, response: Response
+) -> QueryResponse:
+    """Deprecated v1 route — thin wrapper around ``execute_query``.
+
+    v2: Prefer ``POST /`` with JSON-RPC ``message/send``
+    + ``metadata.oldman.intent="query"``.
+    """
+    response.headers["Deprecation"] = (
+        "A2A-replacement; use POST / with method=message/send"
+    )
+    conn = request.app.state.db
+    provider = getattr(request.app.state, "narrative_provider", None)
+    if provider is None:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail={
+                "status": "unavailable",
+                "reason": "narrative_provider_unconfigured",
+            },
+        )
+
+    judge_provider = (
+        getattr(request.app.state, "judge_provider", None)
+        or getattr(request.app.state, "reflection_provider", None)
+    )
+
+    return await execute_query(
+        conn,
+        provider,
+        req,
+        judge_provider=judge_provider,
     )

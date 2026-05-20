@@ -1,3 +1,3 @@
 """oldman_agent — 꼰대 정보통 A2A 메타-기록자."""
 
-__version__ = "0.1.2a0"
+__version__ = "0.2.0a0"
