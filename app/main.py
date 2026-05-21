@@ -30,6 +30,7 @@ from fastapi import FastAPI
 from app import __version__
 from app.a2a.executor import OldmanAgentExecutor
 from app.a2a.routes import build_a2a_routes
+from app.api.admin import router as admin_router
 from app.api.agent_card import build_agent_card, card_to_well_known_dict
 from app.api.agent_card import router as agent_card_router
 from app.api.publish import router as publish_router
@@ -111,6 +112,7 @@ def create_app() -> FastAPI:
     app.include_router(publish_router)
     app.include_router(agent_card_router)
     app.include_router(query_router)
+    app.include_router(admin_router)
 
     # Mount A2A JSON-RPC + .well-known routes (Starlette routes directly on app.router)
     a2a_routes = build_a2a_routes(executor, agent_card_proto, card_dict)
