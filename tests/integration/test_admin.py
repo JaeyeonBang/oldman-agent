@@ -44,17 +44,18 @@ async def test_admin_memory_empty_db(admin_client: AsyncClient) -> None:
 
 @pytest.mark.asyncio
 async def test_admin_memory_after_publish(admin_client: AsyncClient) -> None:
-    r = await admin_client.post(
-        "/publish",
-        json={
-            "event_kind": "chat",
-            "source_agent": "agent_alice",
-            "observed_agent": "agent_bob",
-            "declared_source_type": "third_party",
-            "payload": {"text": "hi from admin smoke"},
-        },
+    from tests._a2a_helpers import publish_event
+
+    status, ack = await publish_event(
+        admin_client,
+        event_kind="chat",
+        source_agent="agent_alice",
+        observed_agent="agent_bob",
+        declared_source_type="third_party",
+        payload={"text": "hi from admin smoke"},
     )
-    assert r.status_code == 200
+    assert status == 200
+    assert ack.get("status") == "stored"
 
     r = await admin_client.get("/admin/memory")
     body = r.json()

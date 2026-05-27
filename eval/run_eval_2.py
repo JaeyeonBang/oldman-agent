@@ -83,18 +83,32 @@ class RuleBasedMockJudge:
 # ── Live judge (Anthropic Haiku) ──────────────────────────────────────────────
 
 class _LiveAnthropicJudge:
-    """실제 Anthropic Haiku judge (--live 모드)."""
+    """실제 LLM judge (--live 모드).
+
+    ANTHROPIC_API_KEY가 있으면 Anthropic Haiku, 없고 OPENROUTER_API_KEY가
+    있으면 OpenRouter 경유.
+    """
 
     def __init__(self) -> None:
-        from app.llm.providers.anthropic import AnthropicProvider
+        anthropic_key = os.environ.get("ANTHROPIC_API_KEY", "")
+        openrouter_key = os.environ.get("OPENROUTER_API_KEY", "")
+        if anthropic_key:
+            from app.llm.providers.anthropic import AnthropicProvider
 
-        api_key = os.environ.get("ANTHROPIC_API_KEY", "")
-        if not api_key:
-            raise RuntimeError("ANTHROPIC_API_KEY 환경변수가 필요합니다 (--live 모드)")
-        self._provider = AnthropicProvider(
-            model="claude-haiku-4-5-20251001",
-            api_key=api_key,
-        )
+            self._provider: Any = AnthropicProvider(
+                model="claude-haiku-4-5-20251001", api_key=anthropic_key
+            )
+        elif openrouter_key:
+            from app.llm.providers.openrouter import OpenRouterProvider
+
+            model = os.environ.get(
+                "OPENROUTER_DEFAULT_MODEL", "anthropic/claude-haiku-4-5"
+            )
+            self._provider = OpenRouterProvider(api_key=openrouter_key, model=model)
+        else:
+            raise RuntimeError(
+                "ANTHROPIC_API_KEY 또는 OPENROUTER_API_KEY 환경변수가 필요합니다 (--live 모드)"
+            )
 
     async def complete(self, req: LLMRequest) -> LLMResponse:
         return await self._provider.complete(req)

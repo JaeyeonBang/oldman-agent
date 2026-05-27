@@ -77,17 +77,32 @@ class _MockGoldenProvider:
 
 
 class _LiveAnthropicProvider:
-    """실제 Anthropic Haiku 호출 래퍼 (--live 모드)."""
+    """실제 LLM 호출 래퍼 (--live 모드).
+
+    ANTHROPIC_API_KEY가 있으면 Anthropic Haiku, 없고 OPENROUTER_API_KEY가
+    있으면 OpenRouter 경유 (OPENROUTER_DEFAULT_MODEL 사용).
+    """
 
     def __init__(self) -> None:
-        from app.llm.providers.anthropic import AnthropicProvider
+        anthropic_key = os.environ.get("ANTHROPIC_API_KEY", "")
+        openrouter_key = os.environ.get("OPENROUTER_API_KEY", "")
+        if anthropic_key:
+            from app.llm.providers.anthropic import AnthropicProvider
 
-        api_key = os.environ.get("ANTHROPIC_API_KEY", "")
-        if not api_key:
-            raise RuntimeError(
-                "ANTHROPIC_API_KEY 환경변수가 필요합니다 (--live 모드)"
+            self._provider: Any = AnthropicProvider(api_key=anthropic_key)
+            self._backend = "anthropic"
+        elif openrouter_key:
+            from app.llm.providers.openrouter import OpenRouterProvider
+
+            model = os.environ.get(
+                "OPENROUTER_DEFAULT_MODEL", "anthropic/claude-haiku-4-5"
             )
-        self._provider = AnthropicProvider(api_key=api_key)
+            self._provider = OpenRouterProvider(api_key=openrouter_key, model=model)
+            self._backend = f"openrouter({model})"
+        else:
+            raise RuntimeError(
+                "ANTHROPIC_API_KEY 또는 OPENROUTER_API_KEY 환경변수가 필요합니다 (--live 모드)"
+            )
 
     async def complete(self, req: LLMRequest) -> LLMResponse:
         return await self._provider.complete(req)

@@ -25,14 +25,11 @@ import logging
 from typing import Any, Literal
 
 import duckdb
-from fastapi import APIRouter, HTTPException, Request, Response, status
 
 from app.api.schemas import QueryRequest, QueryResponse
 from app.narrative.renderer import render_narrative
 
 _LOG = logging.getLogger(__name__)
-
-router = APIRouter()
 
 
 class ProviderUnavailableError(Exception):
@@ -84,37 +81,7 @@ async def execute_query(
     )
 
 
-@router.post("/query", response_model=QueryResponse)
-async def query(
-    req: QueryRequest, request: Request, response: Response
-) -> QueryResponse:
-    """Deprecated v1 route — thin wrapper around ``execute_query``.
-
-    v2: Prefer ``POST /`` with JSON-RPC ``message/send``
-    + ``metadata.oldman.intent="query"``.
-    """
-    response.headers["Deprecation"] = (
-        "A2A-replacement; use POST / with method=message/send"
-    )
-    conn = request.app.state.db
-    provider = getattr(request.app.state, "narrative_provider", None)
-    if provider is None:
-        raise HTTPException(
-            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail={
-                "status": "unavailable",
-                "reason": "narrative_provider_unconfigured",
-            },
-        )
-
-    judge_provider = (
-        getattr(request.app.state, "judge_provider", None)
-        or getattr(request.app.state, "reflection_provider", None)
-    )
-
-    return await execute_query(
-        conn,
-        provider,
-        req,
-        judge_provider=judge_provider,
-    )
+# v2.1: deprecated ``/query`` HTTP route removed. Use JSON-RPC ``message/send``
+# (or ``message/stream``) with ``metadata.oldman.intent="query"`` at POST /.
+# ``execute_query`` above remains as the core domain function called by
+# ``app/a2a/executor.py``.

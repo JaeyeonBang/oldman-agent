@@ -30,7 +30,6 @@ from datetime import UTC, datetime
 from typing import Any
 
 import duckdb
-from fastapi import APIRouter, BackgroundTasks, HTTPException, Request, Response, status
 
 from app.api.schemas import PublishRequest, PublishResponse
 from app.config import Settings
@@ -43,9 +42,6 @@ from app.storage.dedup import (
     payload_sha256,
     tokenize,
 )
-
-router = APIRouter()
-
 
 # ── domain errors ───────────────────────────────────────────────────────────
 
@@ -220,57 +216,6 @@ async def execute_publish(
     return PublishResponse(status="stored", event_id=event_id)
 
 
-# ── deprecated HTTP route (kept for backward compat; thin wrapper) ──────────
-
-
-@router.post(
-    "/publish",
-    response_model=PublishResponse,
-    responses={
-        409: {"model": PublishResponse},
-        422: {"model": PublishResponse},
-    },
-)
-async def publish(
-    req: PublishRequest,
-    request: Request,
-    response: Response,
-    background_tasks: BackgroundTasks,
-) -> PublishResponse:
-    """Deprecated v1 route — thin wrapper around ``execute_publish``.
-
-    v2: Prefer ``POST /`` with JSON-RPC ``message/send``
-    + ``metadata.oldman.intent="publish"``. This route remains for backward
-    compatibility with v1 dogfood scripts; will be removed in v2.1.
-    """
-    response.headers["Deprecation"] = (
-        "A2A-replacement; use POST / with method=message/send"
-    )
-    conn: duckdb.DuckDBPyConnection = request.app.state.db
-    settings: Settings = request.app.state.settings
-    provider = getattr(request.app.state, "reflection_provider", None)
-    done_event = getattr(request.app.state, "reflection_done", None)
-
-    def _schedule(coro_factory: Callable[[], Awaitable[None]]) -> None:
-        # Adapt to BackgroundTasks.add_task: pass the factory (a 0-arg async fn).
-        background_tasks.add_task(coro_factory)
-
-    try:
-        return await execute_publish(
-            conn,
-            settings,
-            req,
-            reflection_provider=provider,
-            reflection_done_event=done_event,
-            schedule_reflection=_schedule if provider is not None else None,
-        )
-    except BlockedKindError as e:
-        raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail={"status": e.status_text, "reason": e.reason},
-        ) from e
-    except (JaccardDuplicateError, ExactHashDuplicateError) as e:
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail={"status": e.status_text, "reason": e.reason},
-        ) from e
+# v2.1: deprecated ``/publish`` HTTP route removed. Use JSON-RPC ``message/send``
+# with ``metadata.oldman.intent="publish"`` at POST /. ``execute_publish`` above
+# remains as the core domain function called by ``app/a2a/executor.py``.

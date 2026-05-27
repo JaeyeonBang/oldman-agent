@@ -455,90 +455,80 @@ class TestRendererProviderErrorRobustness:
 
 class TestPublishConstraintExceptionClassification:
     """BUG-2 FIXED v1.0.3: only payload_hash UNIQUE collisions map to
-    exact_hash. PK collisions re-raise → 500."""
+    exact_hash. PK collisions re-raise. v2.1: HTTP /publish removed, so
+    these tests exercise ``execute_publish`` directly."""
 
     @pytest.mark.asyncio
-    async def test_pk_collision_on_event_id_re_raises_as_500(
-        self, tmp_db_path, monkeypatch: pytest.MonkeyPatch
+    async def test_pk_collision_on_event_id_re_raises(
+        self, tmp_db: duckdb.DuckDBPyConnection, monkeypatch: pytest.MonkeyPatch
     ) -> None:
-        """Force uuid4() collision → IntegrityError on event_id PK.
-        The new classifier matches only 'payload_hash' substring, so PK
-        collisions surface as 500 (system bug) instead of masquerading as
-        dedup. The publish row is correctly NOT inserted (ROLLBACK ran).
-        """
-        import os
-
-        os.environ["OLDMAN_DB_PATH"] = str(tmp_db_path)
+        """Force uuid4() collision → IntegrityError on event_id PK. The
+        classifier matches only 'payload_hash', so PK collisions propagate as
+        non-PublishError exception. ROLLBACK leaves the events table at 1 row."""
         from app.api import publish as publish_mod
-        from app.main import create_app
-
-        app = create_app()
+        from app.api.publish import PublishError, execute_publish
+        from app.api.schemas import PublishRequest
+        from app.config import Settings
 
         fixed_id = "11111111-2222-3333-4444-555555555555"
-        conn = app.state.db
-        conn.execute(
+        tmp_db.execute(
             "INSERT INTO events "
             "(event_id, ts, kind, source_agent, source_type, payload_json, payload_hash) "
             "VALUES (?, ?, 'observation', 'a', 'self', '{}', 'distinct_hash')",
             [fixed_id, datetime.now(UTC)],
         )
-
         monkeypatch.setattr(
             publish_mod.uuid, "uuid4", lambda: uuid.UUID(fixed_id)
         )
 
-        from httpx import ASGITransport, AsyncClient
+        req = PublishRequest(
+            event_kind="chat",
+            source_agent="a",
+            declared_source_type="self",
+            payload={"text": "novel content not yet hashed"},
+        )
+        settings = Settings(
+            db_path=":memory:", jaccard_window=50, jaccard_threshold=0.9
+        )
 
-        transport = ASGITransport(app=app, raise_app_exceptions=False)
-        async with AsyncClient(transport=transport, base_url="http://test") as client:
-            resp = await client.post(
-                "/publish",
-                json={
-                    "event_kind": "chat",
-                    "source_agent": "a",
-                    "declared_source_type": "self",
-                    "payload": {"text": "novel content not yet hashed"},
-                },
-            )
-        # PK collision re-raises → FastAPI surfaces as 500.
-        assert resp.status_code == 500
-        # No second row inserted (rollback ran).
-        rows = conn.execute("SELECT count(*) FROM events").fetchone()
+        with pytest.raises(Exception) as exc_info:
+            await execute_publish(tmp_db, settings, req)
+        assert not isinstance(exc_info.value, PublishError), (
+            "PK collision was misclassified as PublishError (BUG-2 regression)"
+        )
+
+        rows = tmp_db.execute("SELECT count(*) FROM events").fetchone()
         assert rows is not None and rows[0] == 1
 
     @pytest.mark.asyncio
-    async def test_payload_hash_collision_still_maps_to_exact_hash(
-        self, tmp_db_path
+    async def test_payload_hash_or_jaccard_dup_raises_dedup_error(
+        self, tmp_db: duckdb.DuckDBPyConnection
     ) -> None:
-        """Regression: BUG-2 fix must NOT regress the legitimate exact_hash path.
-        Identical payloads from the same agent → 409 deduplicated/exact_hash
-        via UNIQUE(payload_hash) (concurrent race uses this path; serial dup
-        is caught by Jaccard first per plan §0 step 3)."""
-        import asyncio as _asyncio
-        import os
+        """Regression: BUG-2 fix must NOT regress dedup. Two identical payloads
+        in sequence → second raises Jaccard (or ExactHash) error."""
+        from app.api.publish import (
+            ExactHashDuplicateError,
+            JaccardDuplicateError,
+            execute_publish,
+        )
+        from app.api.schemas import PublishRequest
+        from app.config import Settings
 
-        os.environ["OLDMAN_DB_PATH"] = str(tmp_db_path)
-        from app.main import create_app
+        req = PublishRequest(
+            event_kind="chat",
+            source_agent="a",
+            declared_source_type="self",
+            payload={"text": "race-me"},
+        )
+        settings = Settings(
+            db_path=":memory:", jaccard_window=50, jaccard_threshold=0.9
+        )
 
-        app = create_app()
-        from httpx import ASGITransport, AsyncClient
-
-        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://t") as c:
-            payload = {
-                "event_kind": "chat",
-                "source_agent": "a",
-                "declared_source_type": "self",
-                "payload": {"text": "race-me"},
-            }
-            r1, r2 = await _asyncio.gather(
-                c.post("/publish", json=payload),
-                c.post("/publish", json=payload),
-            )
-            codes = sorted([r1.status_code, r2.status_code])
-            assert codes == [200, 409]
-            # One of them is exact_hash via UNIQUE constraint
-            r409 = r1 if r1.status_code == 409 else r2
-            assert r409.json()["detail"]["reason"] in {"exact_hash", "jaccard_near_duplicate"}
+        # First publish succeeds
+        await execute_publish(tmp_db, settings, req)
+        # Second hits Jaccard (identical tokens) — that's expected per plan §0 step 3
+        with pytest.raises((JaccardDuplicateError, ExactHashDuplicateError)):
+            await execute_publish(tmp_db, settings, req)
 
 
 class TestEntitiesEpisodicObservedNullJoin:

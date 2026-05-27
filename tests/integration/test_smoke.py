@@ -28,32 +28,38 @@ async def test_smoke_full_publish_cycle(async_client: AsyncClient) -> None:
     assert any("publish" in s.get("tags", []) for s in card["skills"])
     assert card["x-oldman"]["persona"] == "꼰대 정보통"
 
-    payload = {
-        "event_kind": "chat",
-        "source_agent": "agent_alice",
-        "observed_agent": "agent_bob",
-        "declared_source_type": "third_party",
-        "payload": {"text": "smoke-test 한 번 가자"},
-    }
-    p1 = await async_client.post("/publish", json=payload)
-    assert p1.status_code == 200, p1.text
-    assert p1.json()["status"] == "stored"
+    from tests._a2a_helpers import publish_event
 
-    p2 = await async_client.post("/publish", json=payload)
-    assert p2.status_code == 409
-    assert p2.json()["detail"]["reason"] in {"jaccard_near_duplicate", "exact_hash"}
-
-    b = await async_client.post(
-        "/publish",
-        json={
-            "event_kind": "heartbeat",
-            "source_agent": "a",
-            "declared_source_type": "self",
-            "payload": {"v": "1"},
-        },
+    _, ack1 = await publish_event(
+        async_client,
+        event_kind="chat",
+        source_agent="agent_alice",
+        observed_agent="agent_bob",
+        declared_source_type="third_party",
+        payload={"text": "smoke-test 한 번 가자"},
     )
-    assert b.status_code == 422
-    assert b.json()["detail"]["reason"] == "blocklisted_kind"
+    assert ack1.get("status") == "stored", ack1
+
+    _, ack2 = await publish_event(
+        async_client,
+        event_kind="chat",
+        source_agent="agent_alice",
+        observed_agent="agent_bob",
+        declared_source_type="third_party",
+        payload={"text": "smoke-test 한 번 가자"},
+    )
+    assert ack2.get("status") == "deduplicated", ack2
+    assert ack2.get("reason") in {"jaccard_near_duplicate", "exact_hash"}
+
+    _, ack3 = await publish_event(
+        async_client,
+        event_kind="heartbeat",
+        source_agent="a",
+        declared_source_type="self",
+        payload={"v": "1"},
+    )
+    assert ack3.get("status") == "blocked", ack3
+    assert ack3.get("reason") == "blocklisted_kind"
 
 
 # ── M2 smoke: 10-publish loop triggers reflection ──────────────────────────────
@@ -83,7 +89,10 @@ async def m2_smoke_client(tmp_db_path: Path) -> AsyncIterator[tuple[AsyncClient,
     from app.main import create_app
 
     app = create_app()
-    app.state.reflection_provider = _SmokeCannedProvider()
+    canned = _SmokeCannedProvider()
+    app.state.reflection_provider = canned
+    # v2.1: executor caches providers at construction time → override here too
+    app.state.a2a_executor.reflection_provider = canned
     transport = ASGITransport(app=app)
     async with AsyncClient(transport=transport, base_url="http://test") as client:
         yield client, tmp_db_path
@@ -94,17 +103,19 @@ async def test_m2_smoke_10_publish_triggers_reflection(
     m2_smoke_client: tuple[AsyncClient, Path],
 ) -> None:
     """M2 acceptance: 10 publish → ≥1 reflection row appears, traits_json populated."""
+    from tests._a2a_helpers import publish_event
+
     client, db_path = m2_smoke_client
 
     for i in range(10):
-        payload = {
-            "event_kind": "observation",
-            "source_agent": "agent_alice",
-            "declared_source_type": "self",
-            "payload": {"i": i, "msg": f"smoke_msg_{i}"},
-        }
-        r = await client.post("/publish", json=payload)
-        assert r.status_code == 200, r.text
+        _, ack = await publish_event(
+            client,
+            event_kind="observation",
+            source_agent="agent_alice",
+            declared_source_type="self",
+            payload={"i": i, "msg": f"smoke_msg_{i}"},
+        )
+        assert ack.get("status") == "stored", ack
 
     # background reflection 완료 대기
     for _ in range(50):
@@ -211,9 +222,13 @@ async def m3_smoke_client(
         [rid, ts, ts, ts],
     )
 
-    app.state.narrative_provider = _M3CannedNarrativeProvider(event_ids)
-    # bootstrap이 MockProvider judge를 주입했으므로 grounded judge로 교체
-    app.state.judge_provider = _M3GroundedJudgeProvider()
+    narrative = _M3CannedNarrativeProvider(event_ids)
+    judge = _M3GroundedJudgeProvider()
+    app.state.narrative_provider = narrative
+    app.state.judge_provider = judge
+    # v2.1: executor caches providers; override executor refs too
+    app.state.a2a_executor.narrative_provider = narrative
+    app.state.a2a_executor.judge_provider = judge
 
     transport = ASGITransport(app=app)
     async with AsyncClient(transport=transport, base_url="http://test") as client:
@@ -225,18 +240,17 @@ async def test_m3_smoke_query_returns_cited_narrative(
     m3_smoke_client: tuple[AsyncClient, list[str]],
 ) -> None:
     """M3 acceptance: /query → 200, answer non-empty, citations exist, all short_ids in DB."""
+    from tests._a2a_helpers import run_query
+
     client, event_ids = m3_smoke_client
 
-    r = await client.post(
-        "/query",
-        json={
-            "question": "agent_alice가 최근 무엇을 했나요?",
-            "subject_agent": "agent_alice",
-            "max_citations": 10,
-        },
+    status, body = await run_query(
+        client,
+        question="agent_alice가 최근 무엇을 했나요?",
+        subject_agent="agent_alice",
+        max_citations=10,
     )
-    assert r.status_code == 200, r.text
-    body = r.json()
+    assert status == 200, body
 
     assert body["is_cold_start"] is False
     assert body["used_fallback"] is False
@@ -333,8 +347,12 @@ async def m4_smoke_client(
     )
 
     judge = _M4GroundedJudgeProvider()
-    app.state.narrative_provider = _M4FabricatedNarrativeProvider(event_ids)
+    narrative = _M4FabricatedNarrativeProvider(event_ids)
+    app.state.narrative_provider = narrative
     app.state.judge_provider = judge
+    # v2.1: executor caches providers; override executor refs too
+    app.state.a2a_executor.narrative_provider = narrative
+    app.state.a2a_executor.judge_provider = judge
 
     transport = ASGITransport(app=app)
     async with AsyncClient(transport=transport, base_url="http://test") as client:
@@ -347,42 +365,32 @@ async def test_m4_smoke_strict_validator_catches_hallucination(
 ) -> None:
     """M4 acceptance: strict validator가 existence 통과했지만 날조된 주장을 잡아 fallback."""
     from app.state.cold_start import COLD_START_FALLBACK_MESSAGE
+    from tests._a2a_helpers import run_query
 
     client, _event_ids, judge = m4_smoke_client
 
     # strict_mode=True(기본) — fabricated narrative → judge가 잡음 → 재시도 → fallback
-    r = await client.post(
-        "/query",
-        json={
-            "question": "agent_alice가 최근 무엇을 했나요?",
-            "subject_agent": "agent_alice",
-            "strict_mode": True,
-        },
+    status, body = await run_query(
+        client,
+        question="agent_alice가 최근 무엇을 했나요?",
+        subject_agent="agent_alice",
+        strict_mode=True,
     )
-    assert r.status_code == 200, r.text
-    body = r.json()
+    assert status == 200, body
 
-    # judge가 hallucination을 잡아 모든 시도 실패 → fallback
     assert body["used_fallback"] is True, (
         "fabricated 주장은 strict validator에 의해 잡혀 fallback이어야 합니다"
     )
     assert body["answer"] == COLD_START_FALLBACK_MESSAGE
-
-    # judge가 실제로 호출됐어야 함 (존재 검증만으로는 통과됐을 것)
     assert judge.calls >= 1, "judge provider가 호출되어야 합니다"
 
-    # strict_mode=False이면 existence만 확인 → 통과 (존재하는 short_id 사용)
-    r2 = await client.post(
-        "/query",
-        json={
-            "question": "agent_alice가 최근 무엇을 했나요?",
-            "subject_agent": "agent_alice",
-            "strict_mode": False,
-        },
+    status2, body2 = await run_query(
+        client,
+        question="agent_alice가 최근 무엇을 했나요?",
+        subject_agent="agent_alice",
+        strict_mode=False,
     )
-    assert r2.status_code == 200, r2.text
-    body2 = r2.json()
-    # existence-only → FABRICATED_ 내러티브 통과 (존재하는 short_id이므로)
+    assert status2 == 200, body2
     assert body2["used_fallback"] is False, (
         "existence-only 모드에서는 short_id가 유효하므로 통과해야 합니다"
     )
@@ -441,19 +449,19 @@ async def test_full_pipeline_with_smart_mock_no_keys(
     app = create_app()
     transport = ASGITransport(app=app)
 
+    from tests._a2a_helpers import publish_event, run_query
+
     async with AsyncClient(transport=transport, base_url="http://test") as client:
         # Step 1: publish 10 events from agent_alice
         for i in range(10):
-            r = await client.post(
-                "/publish",
-                json={
-                    "event_kind": "observation",
-                    "source_agent": "agent_alice",
-                    "declared_source_type": "self",
-                    "payload": {"i": i, "msg": f"smart_mock_smoke_{i}"},
-                },
+            _, ack = await publish_event(
+                client,
+                event_kind="observation",
+                source_agent="agent_alice",
+                declared_source_type="self",
+                payload={"i": i, "msg": f"smart_mock_smoke_{i}"},
             )
-            assert r.status_code == 200, r.text
+            assert ack.get("status") == "stored", ack
 
         # Step 2: poll up to 5s for reflection to land
         # (BackgroundTasks runs scheduler; smart mock JSON parses → row lands)
@@ -476,17 +484,14 @@ async def test_full_pipeline_with_smart_mock_no_keys(
         )
 
         # Step 3: /query — smart mock narrative provider returns citations
-        r = await client.post(
-            "/query",
-            json={
-                "question": "agent_alice가 최근 무엇을 했나요?",
-                "subject_agent": "agent_alice",
-                "max_citations": 10,
-                "strict_mode": False,
-            },
+        status, body = await run_query(
+            client,
+            question="agent_alice가 최근 무엇을 했나요?",
+            subject_agent="agent_alice",
+            max_citations=10,
+            strict_mode=False,
         )
-        assert r.status_code == 200, r.text
-        body = r.json()
+        assert status == 200, body
 
         assert body["is_cold_start"] is False, "reflection이 landing됐으므로 cold-start가 아니어야 함"
         assert body["used_fallback"] is False, "smart mock narrative는 유효한 인용을 포함해야 함"

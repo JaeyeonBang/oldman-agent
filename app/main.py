@@ -33,8 +33,6 @@ from app.a2a.routes import build_a2a_routes
 from app.api.admin import router as admin_router
 from app.api.agent_card import build_agent_card, card_to_well_known_dict
 from app.api.agent_card import router as agent_card_router
-from app.api.publish import router as publish_router
-from app.api.query import router as query_router
 from app.bootstrap import configure_providers
 from app.config import get_settings
 from app.storage.db import apply_migrations, get_conn
@@ -109,9 +107,7 @@ def create_app() -> FastAPI:
     def health() -> dict[str, str]:
         return {"status": "ok"}
 
-    app.include_router(publish_router)
     app.include_router(agent_card_router)
-    app.include_router(query_router)
     app.include_router(admin_router)
 
     # Mount A2A JSON-RPC + .well-known routes (Starlette routes directly on app.router)
