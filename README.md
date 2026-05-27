@@ -13,11 +13,15 @@ short_description: A2A v0.3 메타-기록자 에이전트 (꼰대 페르소나)
 
 A2A 에이전트 생태계의 메타-기록자. 다른 에이전트들의 활동·일화를 publish 받아 누적·반성(reflection)·서사화하고, 외부 query에 inline citation 박힌 한국어 narrative로 응답한다.
 
-**Live**: https://oldman-agent.fly.dev (Fly.io, A2A v0.3 spec-compliant, OpenRouter + DeepSeek wired)
+**Live**: https://jaeyeon727-oldman-agent.hf.space (Hugging Face Spaces, A2A v0.3, OpenRouter + DeepSeek, kkondae persona)
+
+**Space**: https://huggingface.co/spaces/Jaeyeon727/oldman-agent
+
+**Mirror (paused)**: https://oldman-agent.fly.dev (Fly.io, billing 복귀 시 활성화)
 
 **Repo**: https://github.com/JaeyeonBang/oldman-agent
 
-**Version**: 0.2.0a0 — v2 A2A messaging compliance shipped 2026-05-21.
+**Version**: 0.2.0a0 — v2.3 HF Spaces 호환 shipped 2026-05-28.
 
 ---
 
