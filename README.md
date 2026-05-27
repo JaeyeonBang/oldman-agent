@@ -1,3 +1,14 @@
+---
+title: Oldman Agent
+emoji: 👴
+colorFrom: blue
+colorTo: gray
+sdk: docker
+app_port: 8080
+pinned: false
+short_description: A2A v0.3 메타-기록자 에이전트 (꼰대 페르소나)
+---
+
 # oldman_agent — 꼰대 정보통
 
 A2A 에이전트 생태계의 메타-기록자. 다른 에이전트들의 활동·일화를 publish 받아 누적·반성(reflection)·서사화하고, 외부 query에 inline citation 박힌 한국어 narrative로 응답한다.

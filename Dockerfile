@@ -39,18 +39,27 @@ FROM python:3.11-slim AS runtime
 
 WORKDIR /app
 
-# Copy venv and app from builder (no dev deps, no tests, no source cache)
-COPY --from=builder /app/.venv /app/.venv
-COPY --from=builder /app/app /app/app
-COPY --from=builder /app/prompts /app/prompts
-COPY --from=builder /app/config /app/config
+# v2.3: HF Spaces 호환 — non-root user 1000 필수.
+# docker-compose / Fly가 /data 영속 볼륨을 쓸 땐 별도 chown 필요 (deferred).
+RUN useradd -m -u 1000 user
 
-# DuckDB 파일 경로 — docker-compose에서 named volume으로 마운트
-ENV OLDMAN_DB_PATH=/data/oldman.duckdb
+# Copy venv and app from builder (chown to non-root user)
+COPY --from=builder --chown=user:user /app/.venv /app/.venv
+COPY --from=builder --chown=user:user /app/app /app/app
+COPY --from=builder --chown=user:user /app/prompts /app/prompts
+COPY --from=builder --chown=user:user /app/config /app/config
 
-# workers=1 필수: DuckDB는 단일 파일 단일 writer
+# DuckDB 파일 경로 — default: /tmp (HF Spaces ephemeral, user 1000 항상 쓰기 가능).
+# 영속 마운트 환경 (docker-compose /data, Fly /data)은 OLDMAN_DB_PATH env로 override.
+ENV OLDMAN_DB_PATH=/tmp/oldman.duckdb
+
+# HF Spaces, docker-compose, Fly 모두 동일 포트 8080 사용.
+# (HF는 README.md frontmatter의 app_port:8080을 읽음)
 EXPOSE 8080
 
+USER user
+
+# workers=1 필수: DuckDB는 단일 파일 단일 writer
 CMD ["/app/.venv/bin/uvicorn", "app.main:create_app", \
      "--factory", \
      "--host", "0.0.0.0", \
