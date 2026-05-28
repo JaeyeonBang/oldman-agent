@@ -48,6 +48,7 @@ from app.api.publish import (
 )
 from app.api.query import ProviderUnavailableError, execute_query
 from app.api.schemas import PublishRequest, QueryRequest
+from app.narrative.smalltalk import match_smalltalk
 from app.config import Settings
 
 _LOG = logging.getLogger(__name__)
@@ -242,6 +243,27 @@ class OldmanAgentExecutor(AgentExecutor):
                 context_id,
                 "query intent requires a TextPart containing the question",
             )
+            return
+
+        # v2.4: 일상 대화 + 자기소개는 evidence/citation pipeline 우회.
+        # citation 없는 응답이라 D7 inline-citation 원칙과 충돌하지 않음
+        # (사실 주장이 아니라 인사·소개·기능 안내).
+        canned = match_smalltalk(question)
+        if canned is not None:
+            await emit_artifact(
+                event_queue,
+                task_id,
+                context_id,
+                text=canned,
+                data={
+                    "citations": [],
+                    "is_cold_start": False,
+                    "used_fallback": False,
+                    "retries_used": 0,
+                    "smalltalk": True,
+                },
+            )
+            await emit_completed(event_queue, task_id, context_id)
             return
 
         try:
