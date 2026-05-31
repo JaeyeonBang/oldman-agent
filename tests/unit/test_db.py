@@ -38,10 +38,12 @@ def test_apply_migrations_is_idempotent(tmp_path: Path) -> None:
     db_file = tmp_path / "t.duckdb"
     conn = get_conn(str(db_file))
     apply_migrations(conn)
+    first = conn.execute("SELECT count(*) FROM _schema_version").fetchone()
     apply_migrations(conn)  # second call must not raise
-    versions = conn.execute("SELECT count(*) FROM _schema_version").fetchone()
-    assert versions is not None
-    assert versions[0] == 1, "schema_version should record exactly one applied migration"
+    second = conn.execute("SELECT count(*) FROM _schema_version").fetchone()
+    assert first is not None and second is not None
+    assert first[0] == second[0], "second apply_migrations must not re-apply"
+    assert first[0] >= 1, "at least one migration must have been applied"
 
 
 def test_payload_hash_has_unique_constraint(tmp_path: Path) -> None:
