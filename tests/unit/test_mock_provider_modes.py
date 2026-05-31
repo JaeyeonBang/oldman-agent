@@ -22,7 +22,7 @@ class TestMockBareMode:
         from app.llm.providers.mock import MockProvider
 
         provider = MockProvider()
-        resp = asyncio.get_event_loop().run_until_complete(provider.complete(_req()))
+        resp = asyncio.run(provider.complete(_req()))
         assert resp.text == "[mock]"
 
     def test_mock_bare_mode_explicit_returns_mock_string(self) -> None:
@@ -30,7 +30,7 @@ class TestMockBareMode:
         from app.llm.providers.mock import MockProvider
 
         provider = MockProvider(mode="bare")
-        resp = asyncio.get_event_loop().run_until_complete(provider.complete(_req()))
+        resp = asyncio.run(provider.complete(_req()))
         assert resp.text == "[mock]"
 
 
@@ -41,7 +41,7 @@ class TestMockReflectionMode:
         from app.reflection.output_schema import TraitsCompiled
 
         provider = MockProvider(mode="reflection")
-        resp = asyncio.get_event_loop().run_until_complete(provider.complete(_req()))
+        resp = asyncio.run(provider.complete(_req()))
         # Must not raise
         parsed = TraitsCompiled.model_validate_json(resp.text)
         assert isinstance(parsed.summary, str)
@@ -56,7 +56,7 @@ class TestMockNarrativeMode:
 
         prompt = "이벤트 목록:\n[↑eaa11bb22] 관찰 · alice\n[↑ecc33dd44] 관찰 · bob\n답변하세요."
         provider = MockProvider(mode="narrative")
-        resp = asyncio.get_event_loop().run_until_complete(provider.complete(_req(prompt)))
+        resp = asyncio.run(provider.complete(_req(prompt)))
         assert "[↑eaa11bb22]" in resp.text
         assert "[↑ecc33dd44]" in resp.text
 
@@ -65,7 +65,7 @@ class TestMockNarrativeMode:
         from app.llm.providers.mock import MockProvider
 
         provider = MockProvider(mode="narrative")
-        resp = asyncio.get_event_loop().run_until_complete(provider.complete(_req("증거 없음.")))
+        resp = asyncio.run(provider.complete(_req("증거 없음.")))
         assert "[↑e" not in resp.text
 
     def test_mock_narrative_mode_caps_at_three_citations(self) -> None:
@@ -75,7 +75,7 @@ class TestMockNarrativeMode:
         markers = " ".join(f"[↑e{i:08x}]" for i in range(10))
         prompt = f"이벤트:\n{markers}\n답변하세요."
         provider = MockProvider(mode="narrative")
-        resp = asyncio.get_event_loop().run_until_complete(provider.complete(_req(prompt)))
+        resp = asyncio.run(provider.complete(_req(prompt)))
         # Count occurrences of [↑e in response
         count = resp.text.count("[↑e")
         assert count <= 3, f"expected ≤3 citations in response, got {count}"
@@ -88,7 +88,7 @@ class TestMockJudgeMode:
         from app.narrative.judge import parse_judge_output
 
         provider = MockProvider(mode="judge")
-        resp = asyncio.get_event_loop().run_until_complete(provider.complete(_req()))
+        resp = asyncio.run(provider.complete(_req()))
         verdict = parse_judge_output(resp.text)
         assert verdict.is_grounded is True
         assert isinstance(verdict.reason, str)
@@ -102,4 +102,4 @@ class TestMockUnknownMode:
         with pytest.raises(ValueError):
             provider = MockProvider(mode="bogus")
             # If lazy validation, trigger via complete()
-            asyncio.get_event_loop().run_until_complete(provider.complete(_req()))
+            asyncio.run(provider.complete(_req()))
