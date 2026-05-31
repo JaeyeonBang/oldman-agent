@@ -48,8 +48,8 @@ from app.api.publish import (
 )
 from app.api.query import ProviderUnavailableError, execute_query
 from app.api.schemas import PublishRequest, QueryRequest
-from app.narrative.smalltalk import match_smalltalk
 from app.config import Settings
+from app.narrative.smalltalk import match_smalltalk
 
 _LOG = logging.getLogger(__name__)
 
