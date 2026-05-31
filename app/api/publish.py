@@ -52,6 +52,8 @@ import duckdb
 
 from app.api.schemas import PublishRequest, PublishResponse
 from app.config import Settings
+from app.credits.ledger import InsufficientFundsError
+from app.credits.ledger import transfer as credits_transfer
 from app.reflection.scheduler import maybe_run_reflection
 from app.storage import entities as ent_store
 from app.storage import events as evt_store
@@ -61,6 +63,8 @@ from app.storage.dedup import (
     payload_sha256,
     tokenize,
 )
+
+OLDMAN_TREASURY_AGENT_ID = "oldman"
 
 # ── domain errors ───────────────────────────────────────────────────────────
 
@@ -90,6 +94,18 @@ class JaccardDuplicateError(PublishError):
 class ExactHashDuplicateError(PublishError):
     def __init__(self) -> None:
         super().__init__("deduplicated", "exact_hash")
+
+
+class OldmanInsufficientFundsError(PublishError):
+    """v1.5 alpha: oldman's credits balance cannot cover publish_reward.
+
+    Treats hypothesis-relevant info hard-failure (no event stored, no
+    payment) per outside voice T2 — surfacing the signal beats silent
+    degradation. ROLLBACK already runs via the publish TX wrapper.
+    """
+
+    def __init__(self) -> None:
+        super().__init__("blocked", "oldman_insufficient_funds")
 
 
 # ── reflection scheduling ───────────────────────────────────────────────────
@@ -206,6 +222,30 @@ async def execute_publish(
                 agent_id=req.observed_agent,
                 source_type=req.declared_source_type,
                 ts=ts,
+            )
+        # 5b. v1.5 alpha — pay publish_reward (oldman -> source_agent).
+        # Skipped when payment_enabled=False (v1/v2 path) or kill-switch
+        # tripped (PRD D8). Insufficient funds raises a PublishError
+        # subclass so the executor maps it like other blockers.
+        if settings.payment_enabled and not settings.payment_kill_switch:
+            try:
+                credits_tx = credits_transfer(
+                    conn,
+                    from_agent=OLDMAN_TREASURY_AGENT_ID,
+                    to_agent=req.source_agent,
+                    amount=settings.publish_reward,
+                    reason="publish_reward",
+                    event_id=event_id,
+                    starting_grant=settings.starting_grant,
+                )
+            except InsufficientFundsError as e:
+                # Will be caught by outer `except Exception`, ROLLBACK,
+                # then re-raised. Re-raise as a PublishError subclass so
+                # executors map cleanly.
+                raise OldmanInsufficientFundsError() from e
+            conn.execute(
+                "UPDATE events SET credits_tx_id = ? WHERE event_id = ?",
+                [credits_tx.tx_id, event_id],
             )
         conn.execute("COMMIT")
     except duckdb.ConstraintException as e:

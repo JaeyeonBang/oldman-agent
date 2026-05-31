@@ -16,6 +16,13 @@ class Settings:
     db_path: str
     jaccard_window: int
     jaccard_threshold: float
+    # v1.5 alpha — credits ledger (off-chain).
+    payment_enabled: bool = False
+    publish_reward: int = 1
+    query_price: int = 1
+    starting_grant: int = 100
+    # Kill-switch (PRD D8 / outside voice T7c): trips ledger to noop + log.
+    payment_kill_switch: bool = False
 
     @classmethod
     def from_env(cls) -> Settings:
@@ -23,6 +30,15 @@ class Settings:
             db_path=os.environ.get("OLDMAN_DB_PATH", "./oldman.duckdb"),
             jaccard_window=int(os.environ.get("OLDMAN_JACCARD_WINDOW", "50")),
             jaccard_threshold=float(os.environ.get("OLDMAN_JACCARD_THRESHOLD", "0.9")),
+            payment_enabled=os.environ.get("OLDMAN_PAYMENT_ENABLED", "false").lower()
+            in ("1", "true", "yes"),
+            publish_reward=int(os.environ.get("OLDMAN_PUBLISH_REWARD", "1")),
+            query_price=int(os.environ.get("OLDMAN_QUERY_PRICE", "1")),
+            starting_grant=int(os.environ.get("OLDMAN_STARTING_GRANT", "100")),
+            payment_kill_switch=os.environ.get(
+                "OLDMAN_PAYMENT_KILL_SWITCH", "false"
+            ).lower()
+            in ("1", "true", "yes"),
         )
 
 
