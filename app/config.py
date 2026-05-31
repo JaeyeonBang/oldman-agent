@@ -21,6 +21,7 @@ class Settings:
     publish_reward: int = 1
     query_price: int = 1
     starting_grant: int = 100
+    invoice_ttl_seconds: int = 300
     # Kill-switch (PRD D8 / outside voice T7c): trips ledger to noop + log.
     payment_kill_switch: bool = False
 
@@ -35,6 +36,9 @@ class Settings:
             publish_reward=int(os.environ.get("OLDMAN_PUBLISH_REWARD", "1")),
             query_price=int(os.environ.get("OLDMAN_QUERY_PRICE", "1")),
             starting_grant=int(os.environ.get("OLDMAN_STARTING_GRANT", "100")),
+            invoice_ttl_seconds=int(
+                os.environ.get("OLDMAN_INVOICE_TTL_SECONDS", "300")
+            ),
             payment_kill_switch=os.environ.get(
                 "OLDMAN_PAYMENT_KILL_SWITCH", "false"
             ).lower()

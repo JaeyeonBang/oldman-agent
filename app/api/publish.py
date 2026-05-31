@@ -188,9 +188,31 @@ async def execute_publish(
     event_id = str(uuid.uuid4())
     ts = req.ts or datetime.now(UTC)
 
-    # 5. transaction
+    # 5. transaction — pay-first, then persist with credits_tx_id baked
+    # into the INSERT (DuckDB FK on entities_episodic.event_id blocks
+    # post-insert UPDATEs to events).
     try:
         conn.execute("BEGIN")
+
+        credits_tx_id: str | None = None
+        if settings.payment_enabled and not settings.payment_kill_switch:
+            try:
+                credits_tx = credits_transfer(
+                    conn,
+                    from_agent=OLDMAN_TREASURY_AGENT_ID,
+                    to_agent=req.source_agent,
+                    amount=settings.publish_reward,
+                    reason="publish_reward",
+                    event_id=event_id,
+                    starting_grant=settings.starting_grant,
+                )
+            except InsufficientFundsError as e:
+                # Caught by outer `except Exception`, ROLLBACK, then
+                # re-raised. Re-raise as a PublishError subclass so
+                # executors map it like other publish blockers.
+                raise OldmanInsufficientFundsError() from e
+            credits_tx_id = credits_tx.tx_id
+
         evt_store.insert_event(
             conn,
             event_id=event_id,
@@ -200,6 +222,7 @@ async def execute_publish(
             source_type=req.declared_source_type,
             payload=req.payload,
             payload_hash=p_hash,
+            credits_tx_id=credits_tx_id,
         )
         ent_store.append_episodic(
             conn,
@@ -222,30 +245,6 @@ async def execute_publish(
                 agent_id=req.observed_agent,
                 source_type=req.declared_source_type,
                 ts=ts,
-            )
-        # 5b. v1.5 alpha — pay publish_reward (oldman -> source_agent).
-        # Skipped when payment_enabled=False (v1/v2 path) or kill-switch
-        # tripped (PRD D8). Insufficient funds raises a PublishError
-        # subclass so the executor maps it like other blockers.
-        if settings.payment_enabled and not settings.payment_kill_switch:
-            try:
-                credits_tx = credits_transfer(
-                    conn,
-                    from_agent=OLDMAN_TREASURY_AGENT_ID,
-                    to_agent=req.source_agent,
-                    amount=settings.publish_reward,
-                    reason="publish_reward",
-                    event_id=event_id,
-                    starting_grant=settings.starting_grant,
-                )
-            except InsufficientFundsError as e:
-                # Will be caught by outer `except Exception`, ROLLBACK,
-                # then re-raised. Re-raise as a PublishError subclass so
-                # executors map cleanly.
-                raise OldmanInsufficientFundsError() from e
-            conn.execute(
-                "UPDATE events SET credits_tx_id = ? WHERE event_id = ?",
-                [credits_tx.tx_id, event_id],
             )
         conn.execute("COMMIT")
     except duckdb.ConstraintException as e:

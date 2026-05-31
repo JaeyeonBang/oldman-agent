@@ -13,9 +13,10 @@ Lifecycle:
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import logging
 import uuid
-from datetime import datetime
+from datetime import UTC, datetime, timedelta
 from typing import Any
 
 import duckdb
@@ -41,15 +42,21 @@ from app.a2a.task_emitter import (
     emit_working,
 )
 from app.api.publish import (
-    BlockedKindError,
-    ExactHashDuplicateError,
-    JaccardDuplicateError,
+    OLDMAN_TREASURY_AGENT_ID,
+    PublishError,
     execute_publish,
 )
 from app.api.query import ProviderUnavailableError, execute_query
 from app.api.schemas import PublishRequest, QueryRequest
 from app.config import Settings
+from app.credits.ledger import InsufficientFundsError
+from app.credits.ledger import transfer as credits_transfer
 from app.narrative.smalltalk import match_smalltalk
+from app.storage.invoices import (
+    insert_pending_invoice,
+    mark_invoice_invalidated,
+    mark_invoice_settled,
+)
 
 _LOG = logging.getLogger(__name__)
 
@@ -204,15 +211,9 @@ class OldmanAgentExecutor(AgentExecutor):
                     "reason": "",
                 },
             )
-        except BlockedKindError as e:
-            await emit_artifact(
-                event_queue,
-                task_id,
-                context_id,
-                text=e.status_text,
-                data={"status": e.status_text, "reason": e.reason},
-            )
-        except (JaccardDuplicateError, ExactHashDuplicateError) as e:
+        except PublishError as e:
+            # BlockedKindError / JaccardDuplicateError / ExactHashDuplicateError
+            # / OldmanInsufficientFundsError all surface the same shape.
             await emit_artifact(
                 event_queue,
                 task_id,
@@ -279,6 +280,20 @@ class OldmanAgentExecutor(AgentExecutor):
             )
             return
 
+        # v1.5 alpha — pay-to-query (PRD D5: invoice + settle separate TXs).
+        # Skip entirely when disabled or kill-switch tripped.
+        if self.settings.payment_enabled and not self.settings.payment_kill_switch:
+            handled = await self._charge_querier_or_fallback(
+                question=question,
+                subject_agent=req.subject_agent,
+                querier_agent=filters.get("querier_agent"),
+                task_id=task_id,
+                context_id=context_id,
+                event_queue=event_queue,
+            )
+            if handled:
+                return
+
         try:
             response = await execute_query(
                 self.conn,
@@ -305,6 +320,112 @@ class OldmanAgentExecutor(AgentExecutor):
                 "is_cold_start": response.is_cold_start,
                 "used_fallback": response.used_fallback,
                 "retries_used": response.retries_used,
+            },
+        )
+        await emit_completed(event_queue, task_id, context_id)
+
+    # ── v1.5 alpha: pay-to-query ────────────────────────────────────────
+
+    async def _charge_querier_or_fallback(
+        self,
+        *,
+        question: str,
+        subject_agent: str | None,
+        querier_agent: Any,
+        task_id: str,
+        context_id: str,
+        event_queue: EventQueue,
+    ) -> bool:
+        """Issue invoice + attempt ledger settlement. Returns True if a
+        fallback response was already emitted (caller must return).
+
+        Per PRD D5, invoice and settlement are written in *separate*
+        transactions so the audit row survives settlement failure.
+        """
+        if not querier_agent or not isinstance(querier_agent, str):
+            await self._emit_insufficient_funds_fallback(
+                event_queue,
+                task_id,
+                context_id,
+                reason="missing_querier_agent",
+            )
+            return True
+
+        invoice_id = str(uuid.uuid4())
+        expiry = datetime.now(UTC) + timedelta(
+            seconds=self.settings.invoice_ttl_seconds
+        )
+
+        # Step 1: invoice issuance (separate TX).
+        self.conn.execute("BEGIN")
+        insert_pending_invoice(
+            self.conn,
+            invoice_id=invoice_id,
+            query=question,
+            subject_agent=subject_agent,
+            intent_expiry=expiry,
+        )
+        self.conn.execute("COMMIT")
+
+        # Step 2: settlement (separate TX so invoice row survives rejection).
+        try:
+            self.conn.execute("BEGIN")
+            credits_tx = credits_transfer(
+                self.conn,
+                from_agent=querier_agent,
+                to_agent=OLDMAN_TREASURY_AGENT_ID,
+                amount=self.settings.query_price,
+                reason="query_price",
+                invoice_id=invoice_id,
+                starting_grant=self.settings.starting_grant,
+            )
+            mark_invoice_settled(
+                self.conn,
+                invoice_id,
+                credits_tx.tx_id,
+                settled_at=datetime.now(UTC),
+            )
+            self.conn.execute("COMMIT")
+        except InsufficientFundsError:
+            with contextlib.suppress(duckdb.Error):
+                self.conn.execute("ROLLBACK")
+            # Fresh TX so the invalidated marker persists.
+            self.conn.execute("BEGIN")
+            mark_invoice_invalidated(self.conn, invoice_id)
+            self.conn.execute("COMMIT")
+            await self._emit_insufficient_funds_fallback(
+                event_queue,
+                task_id,
+                context_id,
+                reason="querier_insufficient_funds",
+            )
+            return True
+
+        return False
+
+    async def _emit_insufficient_funds_fallback(
+        self,
+        event_queue: EventQueue,
+        task_id: str,
+        context_id: str,
+        *,
+        reason: str,
+    ) -> None:
+        """Canned 토큰 부족 narrative + complete the task. No citations
+        (no real evidence pipeline ran) and used_fallback=True flags
+        the off-path response for the admin dashboard."""
+        await emit_artifact(
+            event_queue,
+            task_id,
+            context_id,
+            text="토큰이 부족하시구먼, 다음에 또 들르시게.",
+            data={
+                "citations": [],
+                "is_cold_start": False,
+                "used_fallback": True,
+                "retries_used": 0,
+                "payment_status": "invalidated",
+                "payment_reason": reason,
             },
         )
         await emit_completed(event_queue, task_id, context_id)
