@@ -530,6 +530,77 @@ class TestPublishConstraintExceptionClassification:
         with pytest.raises((JaccardDuplicateError, ExactHashDuplicateError)):
             await execute_publish(tmp_db, settings, req)
 
+    @pytest.mark.asyncio
+    async def test_concurrent_same_hash_publish_yields_one_success_one_dedup_error(
+        self, tmp_db: duckdb.DuckDBPyConnection
+    ) -> None:
+        """T4 (eng-review P1): two concurrent execute_publish calls with the
+        same payload must produce exactly one success and one dedup error —
+        never two rows. Models the production scenario: single uvicorn worker,
+        two A2A message/send arriving simultaneously on the shared DuckDB
+        connection.
+
+        Whether the race manifests as ExactHashDuplicateError (Jaccard scan
+        passes both, second INSERT trips UNIQUE constraint) or
+        JaccardDuplicateError (second scan sees first row before INSERT) is an
+        implementation detail of the asyncio scheduling — both are valid
+        outcomes that prove no duplicates land in storage.
+        """
+        from app.api.publish import (
+            ExactHashDuplicateError,
+            JaccardDuplicateError,
+            PublishError,
+            execute_publish,
+        )
+        from app.api.schemas import PublishRequest, PublishResponse
+        from app.config import Settings
+
+        req = PublishRequest(
+            event_kind="chat",
+            source_agent="agent_alice",
+            declared_source_type="self",
+            payload={"text": "concurrent race target"},
+        )
+        settings = Settings(
+            db_path=":memory:", jaccard_window=50, jaccard_threshold=0.9
+        )
+
+        results = await asyncio.gather(
+            execute_publish(tmp_db, settings, req),
+            execute_publish(tmp_db, settings, req),
+            return_exceptions=True,
+        )
+
+        successes = [r for r in results if isinstance(r, PublishResponse)]
+        dedup_errors = [
+            r
+            for r in results
+            if isinstance(r, (ExactHashDuplicateError, JaccardDuplicateError))
+        ]
+        other_errors = [
+            r
+            for r in results
+            if isinstance(r, BaseException)
+            and not isinstance(r, PublishError)
+        ]
+
+        assert len(successes) == 1, (
+            f"expected exactly 1 success, got {len(successes)} (results={results!r})"
+        )
+        assert len(dedup_errors) == 1, (
+            f"expected exactly 1 dedup error, got {len(dedup_errors)} "
+            f"(results={results!r})"
+        )
+        assert not other_errors, (
+            f"unexpected non-dedup exception(s): {other_errors!r}"
+        )
+        assert successes[0].status == "stored"
+
+        row_count = tmp_db.execute("SELECT COUNT(*) FROM events").fetchone()
+        assert row_count is not None and row_count[0] == 1, (
+            f"expected exactly 1 events row after race, got {row_count}"
+        )
+
 
 class TestEntitiesEpisodicObservedNullJoin:
     """entities_episodic.observed_agent IS NULL is allowed by schema.
