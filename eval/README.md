@@ -35,3 +35,9 @@ python eval/run_eval_1.py --live
 ## CI 권고
 
 `--mock` 만 CI에서 자동 실행. `--live`는 M2 ship 시점과 prompt 변경 시 수동.
+
+## Baselines
+
+| File | Captured | Notes |
+|---|---|---|
+| [`baselines/v2.5_live_baseline.md`](baselines/v2.5_live_baseline.md) | 2026-05-31 | EVAL-1 mean jaccard 0.593 (4/5 PASS), EVAL-2 0.00% hallucination (100/100), via OpenRouter |

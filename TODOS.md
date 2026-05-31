@@ -24,8 +24,8 @@
 - [x] README consolidation (quickstart, arch, API ref, config, ops, EVAL, troubleshooting) — done 2026-05-20
 - [x] `DESIGN_NOTES.md` — 설계 결정 자서전 (페르소나 제외, validator split, etc.) — done 2026-05-20
 - [ ] Demo video (인간 참여 필요 — 자동화 불가) → **사용자에게 위임**
-- [ ] EVAL-1 live baseline capture (실제 Haiku 호출, jaccard 기록) → `ANTHROPIC_API_KEY` 설정 후 실행
-- [ ] EVAL-2 live baseline capture (실제 Haiku judge, hallucination rate 기록) → `ANTHROPIC_API_KEY` 설정 후 실행
+- [x] **EVAL-1 live baseline capture** — *DONE 2026-05-31 via OpenRouter. mean jaccard **0.593** (4/5 PASS, case_04 WARN at 0.200). 결과: `eval/baselines/v2.5_live_baseline.md`*
+- [x] **EVAL-2 live baseline capture** — *DONE 2026-05-31 via OpenRouter. **0/100 = 0.00% hallucination rate**, 30/30 TP, 0/70 FP. PASS. 결과: `eval/baselines/v2.5_live_baseline.md`*
 
 ## M1 Engineering Review tasks (apply during Phase 1.x)
 
