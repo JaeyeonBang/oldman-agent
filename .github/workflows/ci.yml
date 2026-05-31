@@ -17,12 +17,12 @@ jobs:
         uses: astral-sh/setup-uv@v3
         with:
           version: "0.10.9"
-
-      - name: Install Python 3.11
-        run: uv python install 3.11
+          python-version: "3.11"
 
       - name: Install dependencies
-        run: uv pip install -e ".[dev]" --system
+        run: |
+          uv venv
+          uv pip install -e ".[dev]"
 
       - name: Lint (ruff)
         run: uv run ruff check .
@@ -38,3 +38,24 @@ jobs:
 
       - name: EVAL-2 (citation grounding, mock)
         run: uv run python eval/run_eval_2.py --mock
+
+  deploy-hf:
+    name: Deploy to HF Spaces
+    needs: test
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          lfs: true
+
+      - name: Push to Hugging Face Spaces
+        env:
+          HF_TOKEN: ${{ secrets.HF_TOKEN }}
+          HF_USER: Jaeyeon727
+          HF_SPACE: oldman-agent
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git push --force "https://${HF_USER}:${HF_TOKEN}@huggingface.co/spaces/${HF_USER}/${HF_SPACE}" HEAD:main
