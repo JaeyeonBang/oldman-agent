@@ -59,7 +59,7 @@
 
 ## v1.5 (deferred — separate PRD)
 
-- [ ] Outbound x402 (pay-to-share) — `spikes/outbound_x402.py` scaffold 재활용
+- [~] **Spike A — Outbound x402 (pay-to-share)** — *VERIFIED to challenge boundary 2026-05-31. Server-side x402 v2 stack works (HTTP 402 + decoded challenge JSON proves SDK + middleware + USDC Base Sepolia config). Final mile (signed payment + facilitator settlement) blocked only by faucet human captcha. Outcome: `spikes/spike_a_outcome.md`. Not a pivot — concrete evidence of design hypothesis.*
 - [ ] Inbound ap2+x402 (pay-to-query)
 - [ ] L0 gate (Haiku triage 등) — dogfood 데이터 보고 도입 여부 결정
 - [ ] Sleep-time precompute — top-3 query pattern 측정 후
