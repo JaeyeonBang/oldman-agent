@@ -33,8 +33,8 @@
 - [x] **T2 (P1)** Wrap `publish()` handler in explicit BEGIN/COMMIT/ROLLBACK transaction → L0/L1 consistency — *DONE (publish.py:157-202)*
 - [x] **T3 (P1)** Specify + test `tokenize` edge cases (empty / unicode-Korean / numeric / boolean / null) — *DONE (tests/unit/test_dedup.py:25-46)*
 - [x] **T4 (P1)** Regression test: concurrent same-hash insert returns exactly 1 success + 1 conflict — *DONE 2026-05-31 (tests/unit/test_adversarial_v102.py::test_concurrent_same_hash_publish_yields_one_success_one_dedup_error)*
-- [ ] **T5 (P2)** README: `uvicorn --workers 1` mandatory + DuckDB single-writer rationale
-- [ ] **T6 (P2)** ASCII diagrams in `app/api/publish.py` + `app/storage/dedup.py` top-of-file
+- [x] **T5 (P2)** README: `uvicorn --workers 1` mandatory + DuckDB single-writer rationale — *DONE 2026-05-31 (README §8 Operations: lock 충돌·race-safety backstop·DuckDB→Postgres 마이그레이션 조건)*
+- [x] **T6 (P2)** ASCII diagrams in `app/api/publish.py` + `app/storage/dedup.py` top-of-file — *DONE 2026-05-31 (v2.5 race-safety 흐름 + error mapping + 두 dedup layer 명시)*
 - [x] **T7 (P2)** Sync TODOS.md with new PRD milestones — DONE
 - [x] **T8 (P3)** A2A SDK pub/sub spike deferred to M2 entry checklist — *DONE (M2 spike verdict in spikes/a2a_pubsub_probe.md)*
 

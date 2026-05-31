@@ -242,7 +242,10 @@ uvicorn app.main:create_app --factory --port 8080 --workers 1
 
 ## 8. Operations
 
-- **`workers=1` mandatory** — DuckDB는 단일 writer. multi-process uvicorn은 lock 손상 위험.
+- **`uvicorn --workers 1` mandatory** — DuckDB는 단일 writer만 허용한다. 두 개 이상 worker process가 같은 `.duckdb` 파일에 동시 쓰기 시도하면 **lock 충돌 + 파일 손상** 위험. 단일 worker + asyncio 모델 안에서 publish 흐름은 per-call atomic이며, 추가 race-safety는 `events.payload_hash`의 `UNIQUE` 제약 + `IntegrityError` → `ExactHashDuplicateError` 매핑이 backstop으로 보장한다 (regression test: `tests/unit/test_adversarial_v102.py::test_concurrent_same_hash_publish_yields_one_success_one_dedup_error`).
+  - Docker: `Dockerfile`의 `CMD`는 `--workers 1` 고정
+  - Fly: `fly.toml`의 `internal_port` + auto-scaling은 머신 단위 (각 머신은 자체 DuckDB)
+  - 수평 확장이 필요한 시점에는 DuckDB → Postgres 마이그레이션이 선결 조건 (현재 v1.x scope 외)
 - **Volume persistence** — Docker compose의 `oldman_data` named volume이 `/data` 마운트. fly는 1GB persistent volume.
 - **Background reflection** — publish 응답 후 `BackgroundTasks`가 비동기 reflection 스케줄링. 응답 latency에 영향 없음. LLM 호출 ~5-15s.
 - **Auto-stop machines** (fly) — idle 시 정지, 다음 요청에 cold start. 첫 요청 latency ~2s.

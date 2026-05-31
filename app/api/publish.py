@@ -1,24 +1,43 @@
-"""``POST /publish`` — A2A event ingest with rule blocklist + Jaccard dedup.
+"""``execute_publish`` — A2A event ingest with rule blocklist + dedup.
 
 ::
 
-    Publish flow:
-      request ──▶ pydantic validate ──▶ blocklist gate ──▶ tokenize + Jaccard scan
-                                                               │
-                                                               ▼
-                                                     BEGIN TX ─────────┐
-                                                       insert L0       │
-                                                       append L1b      │
-                                                       touch L1a       │
-                                                     COMMIT ───────────┘
-                                                               │
-                                                               ▼
-                                          200 stored | 409 dedup | 422 blocked
+    Publish flow (v2.5 race-safety):
 
-v2: ``execute_publish()`` core extracted as a callable so both the deprecated
-``/publish`` route and the A2A AgentExecutor invoke the same path. Domain
-errors raise ``PublishError`` subclasses; the route wrapper maps them to
-HTTPException, the executor maps them to Task ack Messages.
+      A2A message/send ──▶ pydantic validate ──▶ blocklist gate
+        (oldman.intent='publish')                     │
+                                                      ▼
+                                          tokenize + Jaccard scan
+                                                      │
+                                                      ▼
+                                        BEGIN TX ────────────────────┐
+                                          INSERT events (L0)         │
+                                          INSERT entities_episodic   │
+                                          UPSERT entities_semantic   │  ← race
+                                        COMMIT ──────────────────────┘    backstop
+                                                      │                   ↓
+                                                      ▼               UNIQUE(payload_hash)
+                                              PublishResponse         IntegrityError
+                                              status='stored'         (msg ⊃ 'payload_hash')
+                                                                      → ROLLBACK
+                                                                      → ExactHashDuplicateError
+
+      Error mapping (raised, never HTTP):
+        blocklist hit      → BlockedKindError
+        Jaccard ≥ threshold → JaccardDuplicateError
+        UNIQUE violation   → ExactHashDuplicateError  (race-safety backstop, T1+T4)
+        any other DB error → ROLLBACK + re-raise (not a PublishError)
+
+v2: ``execute_publish()`` core extracted as a callable so the A2A
+AgentExecutor invokes the same path. Domain errors raise ``PublishError``
+subclasses; the executor maps them to Task ack Messages.
+
+v2.1: HTTP ``/publish`` route removed. Use JSON-RPC ``message/send`` with
+``metadata.oldman.intent="publish"`` at ``POST /``.
+
+v2.5: T4 regression test (`test_concurrent_same_hash_publish_yields_...`)
+locks in: concurrent gather of two identical-payload publishes yields
+exactly 1 success + 1 dedup error + 1 row in ``events``.
 """
 
 from __future__ import annotations

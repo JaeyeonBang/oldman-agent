@@ -2,14 +2,39 @@
 
 ::
 
-    Dedup pipeline:
-      payload (dict) ──▶ payload_sha256 (NFC normalize → canonical JSON → sha256 hex)
-                          │
-                          └─▶ UNIQUE constraint on events.payload_hash (exact dup)
+    Dedup pipeline (two independent layers; either trips → no insert):
 
-      payload (dict) ──▶ tokenize (recurse → string leaves → lower+split)
-                          │
-                          └─▶ jaccard(new, each_of_last_50_by_agent) ≥ 0.9 → near-dup
+      Layer 1 — exact hash (race-safe backstop):
+        payload (dict) ──▶ _canon (NFC normalize, sorted keys)
+                       ──▶ json.dumps compact
+                       ──▶ sha256 hex  ═══▶  events.payload_hash
+                                                    │
+                                                    ▼
+                              UNIQUE constraint (migrations/001_init.sql:16)
+                                                    │
+                                            duplicate INSERT
+                                                    ▼
+                                            IntegrityError
+                                                    │
+                                  (publish.py classifier: msg ⊃ 'payload_hash')
+                                                    ▼
+                                          ExactHashDuplicateError
+                                  (T1 + T4 race-safety backstop; survives
+                                   future async/multi-conn DB evolution)
+
+      Layer 2 — Jaccard near-dup (sliding window):
+        payload (dict) ──▶ tokenize (recurse → string leaves → NFC → lower+split)
+                       ──▶ frozenset of tokens
+                                                    │
+                                                    ▼
+                              jaccard(new, each_of_last_50_by_agent)
+                                                    │
+                                            ≥ threshold (0.9 default)
+                                                    ▼
+                                          JaccardDuplicateError
+
+    tokenize edge cases (covered by tests/unit/test_dedup.py): empty payload,
+    numeric/bool/null leaves, dict keys, lowercase coercion, Korean NFC.
 """
 
 from __future__ import annotations
