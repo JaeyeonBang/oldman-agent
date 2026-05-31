@@ -60,7 +60,7 @@
 ## v1.5 (deferred — separate PRD)
 
 - [~] **Spike A — Outbound x402 (pay-to-share)** — *VERIFIED to challenge boundary 2026-05-31. Server-side x402 v2 stack works (HTTP 402 + decoded challenge JSON proves SDK + middleware + USDC Base Sepolia config). Final mile (signed payment + facilitator settlement) blocked only by faucet human captcha. Outcome: `spikes/spike_a_outcome.md`. Not a pivot — concrete evidence of design hypothesis.*
-- [ ] Inbound ap2+x402 (pay-to-query)
+- [~] **Spike B — Inbound ap2+x402 (pay-to-query)** — *VERIFIED to challenge boundary 2026-05-31. `POST /invoice` 200 + valid ap2 IntentMandate + W3C PaymentRequest carrying x402-exact settlement metadata. `POST /query` 402 (x402 middleware gating). 양방향 결제 토폴로지 가설 SDK+protocol 레벨에서 양쪽 다 확정. Final mile (buyer wallet) 동일 human-gate. Outcome: `spikes/spike_b_outcome.md`. Scaffold: `spikes/inbound_ap2.py`.*
 - [ ] L0 gate (Haiku triage 등) — dogfood 데이터 보고 도입 여부 결정
 - [ ] Sleep-time precompute — top-3 query pattern 측정 후
 - [ ] Rolling credibility window — 결제 stake 생긴 후
