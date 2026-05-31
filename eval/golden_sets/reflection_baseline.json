@@ -7,18 +7,74 @@
       "scope": "agent",
       "subject": "agent_watcher",
       "events": [
-        {"event_id": "e001", "kind": "observation", "payload": {"target": "agent_target", "activity": "file_access"}},
-        {"event_id": "e002", "kind": "observation", "payload": {"target": "agent_target", "activity": "api_call"}},
-        {"event_id": "e003", "kind": "observation", "payload": {"target": "agent_target", "activity": "login"}},
-        {"event_id": "e004", "kind": "observation", "payload": {"target": "agent_target", "activity": "network"}},
-        {"event_id": "e005", "kind": "observation", "payload": {"target": "agent_target", "activity": "file_read"}},
-        {"event_id": "e006", "kind": "report", "payload": {"summary": "target_daily_activity"}}
+        {
+          "event_id": "e001",
+          "kind": "observation",
+          "payload": {
+            "target": "agent_target",
+            "activity": "file_access"
+          }
+        },
+        {
+          "event_id": "e002",
+          "kind": "observation",
+          "payload": {
+            "target": "agent_target",
+            "activity": "api_call"
+          }
+        },
+        {
+          "event_id": "e003",
+          "kind": "observation",
+          "payload": {
+            "target": "agent_target",
+            "activity": "login"
+          }
+        },
+        {
+          "event_id": "e004",
+          "kind": "observation",
+          "payload": {
+            "target": "agent_target",
+            "activity": "network"
+          }
+        },
+        {
+          "event_id": "e005",
+          "kind": "observation",
+          "payload": {
+            "target": "agent_target",
+            "activity": "file_read"
+          }
+        },
+        {
+          "event_id": "e006",
+          "kind": "report",
+          "payload": {
+            "summary": "target_daily_activity"
+          }
+        }
       ],
-      "expected_descriptors": ["감시형", "대상_집중", "observation_우세"],
+      "expected_descriptors": [
+        "감시형",
+        "대상_집중",
+        "observation_우세"
+      ],
       "mock_response": {
         "summary": "이 에이전트는 특정 대상을 집중적으로 감시하는 패턴을 보인다. agent_target에 대한 관찰이 압도적이며 일일 보고서를 생성한다.",
-        "descriptors": ["감시형", "대상_집중", "observation_우세", "보고서_생성"],
-        "evidence_event_ids": ["e001", "e002", "e003", "e004", "e006"]
+        "descriptors": [
+          "감시형",
+          "대상_집중",
+          "observation_우세",
+          "보고서_생성"
+        ],
+        "evidence_event_ids": [
+          "e001",
+          "e002",
+          "e003",
+          "e004",
+          "e006"
+        ]
       }
     },
     {
@@ -26,17 +82,64 @@
       "scope": "agent",
       "subject": "agent_worker",
       "events": [
-        {"event_id": "e010", "kind": "action", "payload": {"type": "task_execute", "task": "data_processing"}},
-        {"event_id": "e011", "kind": "action", "payload": {"type": "api_call", "endpoint": "/data"}},
-        {"event_id": "e012", "kind": "action", "payload": {"type": "task_execute", "task": "model_inference"}},
-        {"event_id": "e013", "kind": "report", "payload": {"status": "completed"}},
-        {"event_id": "e014", "kind": "action", "payload": {"type": "task_execute", "task": "data_processing"}}
+        {
+          "event_id": "e010",
+          "kind": "action",
+          "payload": {
+            "type": "task_execute",
+            "task": "data_processing"
+          }
+        },
+        {
+          "event_id": "e011",
+          "kind": "action",
+          "payload": {
+            "type": "api_call",
+            "endpoint": "/data"
+          }
+        },
+        {
+          "event_id": "e012",
+          "kind": "action",
+          "payload": {
+            "type": "task_execute",
+            "task": "model_inference"
+          }
+        },
+        {
+          "event_id": "e013",
+          "kind": "report",
+          "payload": {
+            "status": "completed"
+          }
+        },
+        {
+          "event_id": "e014",
+          "kind": "action",
+          "payload": {
+            "type": "task_execute",
+            "task": "data_processing"
+          }
+        }
       ],
-      "expected_descriptors": ["자율형", "반복_작업", "action_우세"],
+      "expected_descriptors": [
+        "자율형",
+        "반복_작업",
+        "action_우세"
+      ],
       "mock_response": {
         "summary": "독립적으로 작업을 수행하는 에이전트다. 반복적인 데이터 처리와 모델 추론을 교대로 실행한다.",
-        "descriptors": ["자율형", "반복_작업", "action_우세", "완료_보고"],
-        "evidence_event_ids": ["e010", "e012", "e013"]
+        "descriptors": [
+          "자율형",
+          "반복_작업",
+          "action_우세",
+          "완료_보고"
+        ],
+        "evidence_event_ids": [
+          "e010",
+          "e012",
+          "e013"
+        ]
       }
     },
     {
@@ -44,16 +147,62 @@
       "scope": "pair",
       "subject": "agent_alice:agent_bob",
       "events": [
-        {"event_id": "e020", "kind": "action", "payload": {"observer": "agent_alice", "observed": "agent_bob", "type": "task_delegate"}},
-        {"event_id": "e021", "kind": "report", "payload": {"observer": "agent_bob", "observed": "agent_alice", "type": "task_result"}},
-        {"event_id": "e022", "kind": "action", "payload": {"observer": "agent_alice", "observed": "agent_bob", "type": "task_delegate"}},
-        {"event_id": "e023", "kind": "report", "payload": {"observer": "agent_bob", "observed": "agent_alice", "type": "task_result"}}
+        {
+          "event_id": "e020",
+          "kind": "action",
+          "payload": {
+            "observer": "agent_alice",
+            "observed": "agent_bob",
+            "type": "task_delegate"
+          }
+        },
+        {
+          "event_id": "e021",
+          "kind": "report",
+          "payload": {
+            "observer": "agent_bob",
+            "observed": "agent_alice",
+            "type": "task_result"
+          }
+        },
+        {
+          "event_id": "e022",
+          "kind": "action",
+          "payload": {
+            "observer": "agent_alice",
+            "observed": "agent_bob",
+            "type": "task_delegate"
+          }
+        },
+        {
+          "event_id": "e023",
+          "kind": "report",
+          "payload": {
+            "observer": "agent_bob",
+            "observed": "agent_alice",
+            "type": "task_result"
+          }
+        }
       ],
-      "expected_descriptors": ["협력형", "양방향", "위임-보고_패턴"],
+      "expected_descriptors": [
+        "협력형",
+        "양방향",
+        "위임-보고_패턴"
+      ],
       "mock_response": {
         "summary": "alice가 bob에게 작업을 위임하고 bob이 결과를 보고하는 협력 관계다.",
-        "descriptors": ["협력형", "위임-보고_패턴", "양방향", "규칙적"],
-        "evidence_event_ids": ["e020", "e021", "e022", "e023"]
+        "descriptors": [
+          "협력형",
+          "위임-보고_패턴",
+          "양방향",
+          "규칙적"
+        ],
+        "evidence_event_ids": [
+          "e020",
+          "e021",
+          "e022",
+          "e023"
+        ]
       }
     },
     {
@@ -61,16 +210,117 @@
       "scope": "society",
       "subject": "global",
       "events": [
-        {"event_id": "e030", "kind": "observation", "payload": {"source": "agent_alice", "target": "agent_bob"}},
-        {"event_id": "e031", "kind": "action", "payload": {"source": "agent_charlie"}},
-        {"event_id": "e032", "kind": "observation", "payload": {"source": "agent_bob", "target": "agent_alice"}},
-        {"event_id": "e033", "kind": "action", "payload": {"source": "agent_dave"}}
+        {
+          "event_id": "e030",
+          "kind": "observation",
+          "payload": {
+            "source": "agent_alice",
+            "target": "agent_bob"
+          }
+        },
+        {
+          "event_id": "e031",
+          "kind": "observation",
+          "payload": {
+            "source": "agent_bob",
+            "target": "agent_alice"
+          }
+        },
+        {
+          "event_id": "e032",
+          "kind": "observation",
+          "payload": {
+            "source": "agent_alice",
+            "target": "agent_charlie"
+          }
+        },
+        {
+          "event_id": "e033",
+          "kind": "observation",
+          "payload": {
+            "source": "agent_charlie",
+            "target": "agent_alice"
+          }
+        },
+        {
+          "event_id": "e034",
+          "kind": "observation",
+          "payload": {
+            "source": "agent_bob",
+            "target": "agent_charlie"
+          }
+        },
+        {
+          "event_id": "e035",
+          "kind": "observation",
+          "payload": {
+            "source": "agent_charlie",
+            "target": "agent_bob"
+          }
+        },
+        {
+          "event_id": "e036",
+          "kind": "action",
+          "payload": {
+            "source": "agent_alice"
+          }
+        },
+        {
+          "event_id": "e037",
+          "kind": "action",
+          "payload": {
+            "source": "agent_bob"
+          }
+        },
+        {
+          "event_id": "e038",
+          "kind": "action",
+          "payload": {
+            "source": "agent_charlie"
+          }
+        },
+        {
+          "event_id": "e039",
+          "kind": "action",
+          "payload": {
+            "source": "agent_dave"
+          }
+        },
+        {
+          "event_id": "e040",
+          "kind": "observation",
+          "payload": {
+            "source": "agent_dave",
+            "target": "agent_alice"
+          }
+        },
+        {
+          "event_id": "e041",
+          "kind": "observation",
+          "payload": {
+            "source": "agent_dave",
+            "target": "agent_bob"
+          }
+        }
       ],
-      "expected_descriptors": ["다극형_생태계", "활발한_상호작용"],
+      "expected_descriptors": [
+        "다극형_생태계",
+        "활발한_상호작용",
+        "균형적_활동"
+      ],
       "mock_response": {
-        "summary": "여러 에이전트가 고르게 활동하는 다극 생태계로 상호작용이 활발하다.",
-        "descriptors": ["다극형_생태계", "활발한_상호작용", "균형적_활동"],
-        "evidence_event_ids": ["e030", "e032", "e033"]
+        "summary": "네 에이전트가 균형 있게 참여하는 다극 생태계로, 관찰과 행위가 활발히 교차한다.",
+        "descriptors": [
+          "다극형_생태계",
+          "활발한_상호작용",
+          "균형적_활동"
+        ],
+        "evidence_event_ids": [
+          "e030",
+          "e034",
+          "e036",
+          "e040"
+        ]
       }
     },
     {
@@ -78,14 +328,36 @@
       "scope": "agent",
       "subject": "agent_quiet",
       "events": [
-        {"event_id": "e040", "kind": "action", "payload": {"type": "ping"}},
-        {"event_id": "e041", "kind": "action", "payload": {"type": "ping"}}
+        {
+          "event_id": "e040",
+          "kind": "action",
+          "payload": {
+            "type": "ping"
+          }
+        },
+        {
+          "event_id": "e041",
+          "kind": "action",
+          "payload": {
+            "type": "ping"
+          }
+        }
       ],
-      "expected_descriptors": ["저빈도", "패턴_불명확"],
+      "expected_descriptors": [
+        "저빈도",
+        "패턴_불명확"
+      ],
       "mock_response": {
         "summary": "이벤트 수가 적어 명확한 패턴이 보이지 않는다. 생존 신호만 관찰됨.",
-        "descriptors": ["저빈도", "패턴_불명확", "생존_신호만"],
-        "evidence_event_ids": ["e040", "e041"]
+        "descriptors": [
+          "저빈도",
+          "패턴_불명확",
+          "생존_신호만"
+        ],
+        "evidence_event_ids": [
+          "e040",
+          "e041"
+        ]
       }
     }
   ]
