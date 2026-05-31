@@ -2,7 +2,7 @@
 
 Generated 2026-05-31 by Opus. Sequel to v1 PRD (`oldman-agent-v1.prd.md`) and v2 PRD (`oldman-agent-v2.prd.md`).
 
-**Status**: **DRAFT** — pending `/plan-eng-review`.
+**Status**: **DRAFT → α/β SPLIT** (per `/plan-eng-review` Step 0 scope challenge 2026-05-31). v1.5α (mock-only, G1-G6, ~5h) ships first to test hypothesis cheap; v1.5β (real x402 + admin endpoint + smoke script, G7, ~5h) follows after K1 evaluation gate.
 
 **Relation to prior PRDs**:
 - v1 (Option A memory) + v2 (A2A v0.3 messaging) **stay**. v1.5 is **additive**.
@@ -52,34 +52,44 @@ v1+v2가 ship된 상태에서 dogfood 데이터를 모으는 중이나, **설계
 
 ## 6. Scope
 
-### MVP (v1.5) — 양방향 결제, mock-first, real-wallet smoke
+### MVP (v1.5α) — mock-first integration, ~5h CC
 
-> **Scope 결정 근거**: Spike A + B가 SDK + 패턴을 입증했고, v2가 A2A surface를 클로즈했다. 남은 작업은 (1) DB schema 확장, (2) 결제 어댑터 production wiring, (3) config toggle (gradual rollout), (4) 결제 실패 시 transaction rollback 검증. **production-grade complexity는 transaction + race-safety 영역 (v2.5 이미 lock-in)** 이라 새 위험 surface가 작다.
+> **Scope 결정 근거 (α split, 2026-05-31)**: `/plan-eng-review` Step 0 complexity check가 11 files + 6 new classes를 trigger했고 사용자가 α/β split을 채택. α는 **hypothesis 검증에 필수인 항목만** 포함 — mock으로 양방향 결제 통합 가능성을 cheap+fast 입증. K1 (1주 dogfood 결제 0건) 데이터를 α만으로 수집 → β work sunk cost 절감 옵션.
 
 1. **DB schema 확장** (migration 002):
    - `events` 테이블에 `payment_id VARCHAR NULL`, `amount VARCHAR NULL`, `asset VARCHAR NULL`, `network VARCHAR NULL`, `tx_hash VARCHAR NULL` 추가. 모두 nullable — free path가 유지되므로 NULL 허용 필수.
    - 신규 `invoices` 테이블 — `invoice_id PK, query TEXT, subject_agent NULL, intent_expiry TIMESTAMP, status ENUM(pending|settled|expired|invalidated), payment_id NULL, issued_at, settled_at NULL`.
    - 신규 인덱스: `idx_events_payment_id`, `idx_invoices_status_expiry`.
-2. **Payment Adapter 추상화** (`app/payment/`)
-   - `PaymentClient` protocol — `pay(resource_url, amount, asset) -> PaymentReceipt | PaymentError`. mock 구현 + x402 real 구현.
-   - `PaymentMiddlewareIntegration` — A2A executor 내부에서 ap2 invoice 발행 + x402 settlement 확인. mock + real.
-   - **Config toggle**: `config/payment.yaml` → `enabled: bool`, `mode: mock|real`, `wallet: {key_path | env}`, `prices: {publish_reward, query_price}`. `enabled=false`일 때 v1/v2 코드 path 그대로.
+2. **Payment Adapter (mock only)** (`app/payment/`)
+   - `app/payment/base.py` — `PaymentClient` Protocol, `PaymentReceipt`/`PaymentError` 타입.
+   - `app/payment/mock.py` — `MockPaymentClient` — config-driven outcome 시뮬레이션 (success / network_error / insufficient_funds / timeout / double_spend).
+   - `MockPaymentMiddleware` — A2A executor 안에서 invoice settle을 mock으로 즉시 처리. real x402 PaymentMiddlewareASGI는 v1.5β.
+   - **Config toggle**: `config/payment.yaml` → `enabled: bool`, `mode: mock`, `prices: {publish_reward, query_price}`. `enabled=false`일 때 v1/v2 코드 path 그대로.
 3. **Publish 경로 변경** (`app/api/publish.py`):
-   - `payment_enabled=true` AND `source_agent`이 receive-wallet 갖춤 → outbound x402 호출.
+   - `payment_enabled=true` → `MockPaymentClient.pay()` 호출.
    - 결제 실패 → `PaymentError` raise → 기존 transaction의 ROLLBACK 경로 활용 (event 미저장).
-   - 결제 성공 → `payment_id, amount, asset, network, tx_hash` 컬럼 채워 event INSERT (기존 transaction 안에서).
+   - 결제 성공 → `payment_id, amount, asset, network, tx_hash` 컬럼 채워 event INSERT.
 4. **Query 경로 변경** (`app/a2a/executor.py` query intent dispatch):
-   - `payment_enabled=true`: query intent 도착 → `invoices` 테이블에 pending row + ap2 IntentMandate 합성 → SettlementGate가 settled 확인 후 narrative 진입.
-   - mock mode: 결제 항상 즉시 settle (no on-chain). real mode: x402 PaymentMiddleware 경로 그대로 적용.
+   - `payment_enabled=true`: query intent 도착 → `invoices` 테이블에 pending row + ap2 IntentMandate 합성 → `MockPaymentMiddleware`가 settled 마킹 후 narrative 진입.
    - timeout: invoice expiry 지나면 status='expired' 자동 마킹 (background cleanup task).
-5. **Config + Bootstrap** — `app/bootstrap.py` 확장: `PaymentClient` factory + wallet load. 키 누락 + `mode=real` → fail-fast.
-6. **`/admin/memory` 확장** — `payments_total` (settled USDC), `invoices_pending`, `outbound_spent` 노출 (token-guarded).
-7. **`spikes/outbound_x402.py` reuse** — production payment adapter는 spike의 `pay_and_fetch()` 패턴을 내부화. spike 코드 자체는 docs로 남김.
-8. **Tests**:
-   - **Unit** — `MockPaymentClient`로 outbound success/failure/timeout 모두 시뮬레이션. dedup race-safety 회귀 테스트(v2.5 T4) 결제 layer에서도 유지.
-   - **Integration** — A2A executor를 mocked PaymentClient + mocked PaymentMiddleware로 호출 → publish/query 6 케이스 (free path, mock paid, mock failed, settled, expired, race).
-   - **Live smoke** (manual, faucet-gated) — Base Sepolia 1건씩 e2e. `scripts/payment_smoke.sh` 한 명령.
-9. **Demo 영상 갱신** — 양방향 결제 시각화 1분 추가 (Spike A 스크린샷 + Spike B 인보이스 JSON + wallet 잔액 변화).
+5. **Config + Bootstrap** — `app/bootstrap.py` 확장: `PaymentClient` factory (mock only). `mode=real` 또는 키 시도 시 v1.5β 미구현 명시.
+6. **`spikes/outbound_x402.py` / `spikes/inbound_ap2.py` reuse** — spike 코드 자체는 docs/reference로 남기고, v1.5α는 spike 패턴을 내부화한 mock 어댑터만.
+7. **Tests** (G1-G6):
+   - **Unit** — `MockPaymentClient` 5 케이스 (success, network_error, insufficient_funds, timeout, double_spend). dedup race-safety regression (v2.5 T4) 결제 layer에서도 유지.
+   - **Integration** — A2A executor를 mocked PaymentClient + mocked Middleware로 호출 → publish/query 6 케이스 (free, mock paid, mock failed, settled, expired, race).
+   - **Backward compat regression** — `payment_enabled=false` config로 기존 291 tests 그대로 PASS.
+
+### v1.5β — real client + live smoke + admin endpoint, ~5h CC (deferred)
+
+α가 K1 통과 (dogfood 결제 동기 입증) 후 진입:
+
+1. **`app/payment/x402.py`** — `X402PaymentClient` (real EVM/Base Sepolia client wrapping `spikes/outbound_x402.py` `pay_and_fetch()` 패턴).
+2. **`X402PaymentMiddlewareIntegration`** — real `x402.http.middleware.fastapi.PaymentMiddlewareASGI`를 A2A executor에 wire.
+3. **`config/payment.yaml`** `mode=real` 활성화 + `wallet.{key_env, receive_address_env}` 로드.
+4. **`app/api/admin.py`** `/admin/memory` 확장 — `payments_total` (settled USDC), `invoices_pending`, `outbound_spent` (token-guarded).
+5. **`scripts/payment_smoke.sh`** — Base Sepolia 1건씩 e2e (publish + query) 매뉴얼 검증.
+6. **G7 live smoke** — `scripts/payment_smoke.sh`가 ship gate 추가.
+7. **Demo 영상 갱신** — 양방향 결제 시각화 1분 (Spike A 스크린샷 + Spike B 인보이스 JSON + wallet 잔액 변화).
 
 ### Out of Scope (v1.5)
 
@@ -136,18 +146,31 @@ v1+v2가 ship된 상태에서 dogfood 데이터를 모으는 중이나, **설계
 4. **Per-query pricing?** 초안: flat 0.001 USDC. variance (length-based, tier-based)는 metric 본 후 v2.
 5. **AgentCard 확장**: pay-to-query enabled 표시를 `x-oldman.payment` extension에 넣는가? A2A 표준 외 확장이라 client compat 영향 0이긴 함.
 
-## 11. Implementation order (proposed)
+## 11. Implementation order
 
-1. **Migration 002 + DB layer 확장** (1.5h) — schema 변경 + `payments` storage helper. G1-G2 unit 테스트 RED 먼저.
-2. **`app/payment/` 모듈 신설** (2h) — `PaymentClient` Protocol + `MockPaymentClient` + `X402PaymentClient` wrapping spike pattern. G1 GREEN.
-3. **`app/api/publish.py` outbound integration** (2h) — config-toggled call site. G2/G3 GREEN.
-4. **`app/a2a/executor.py` query invoice + settlement gate** (3h) — ap2 invoice 발행 + mock middleware + 3단계 dispatch. G4/G5 GREEN.
-5. **Bootstrap + config wiring** (1h) — `config/payment.yaml`, bootstrap factory. `/admin/memory` 확장.
-6. **Backward compat regression run** (0.5h) — G6 보장. 기존 291 test 그대로.
-7. **`scripts/payment_smoke.sh` + README walkthrough** (1h) — G7 매뉴얼 가이드.
-8. **Demo 영상 추가본 촬영** (0.5h, optional) — 사용자 단계.
+### v1.5α (this PRD, ~5h CC)
 
-Total CC estimate: ~11h. Human budget 2 주말 (~10h) 빠듯 — P1 pivot 조기 감지를 위해 G1+G2 끝나는 시점에 stop+review 권장.
+1. **Migration 002 + DB layer 확장** (1.5h) — schema 변경 + payment helper. G1-G2 unit RED 먼저.
+2. **`app/payment/{base,mock}.py` 모듈 신설** (1h) — `PaymentClient` Protocol + `MockPaymentClient` only. G1 GREEN.
+3. **`app/api/publish.py` outbound mock integration** (1h) — config-toggled call site. G2/G3 GREEN.
+4. **`app/a2a/executor.py` query invoice + mock settlement gate** (1h) — ap2 invoice 발행 + mock middleware + 3단계 dispatch. G4/G5 GREEN.
+5. **Bootstrap + config wiring** (0.5h) — `config/payment.yaml` (mock only), bootstrap factory.
+6. **Backward compat regression** (0.5h) — G6 보장. `payment_enabled=false`로 기존 291 test 그대로.
+
+→ Ship gate: G1-G6 PASS. K1 (dogfood 1주 결제 시도 0건) 평가 시작.
+
+### v1.5β (deferred PRD addendum, ~5h CC, K1 통과 후 진입)
+
+7. **`app/payment/x402.py`** (2h) — real x402 client wrapping spike. G7 RED.
+8. **executor.py real PaymentMiddlewareASGI integration** (1h) — mock→real swap. G7 GREEN with mock fallback path.
+9. **`config/payment.yaml`** real mode + `app/bootstrap.py` wallet load (0.5h).
+10. **`app/api/admin.py` `/admin/memory` 확장** (0.5h) — payments stats.
+11. **`scripts/payment_smoke.sh` + README walkthrough** (0.5h) — manual Base Sepolia e2e.
+12. **Demo 영상 갱신** (0.5h, optional) — 사용자 단계.
+
+→ Ship gate: G7 live smoke 1회 성공.
+
+**Pivot decision point** (between α and β): K1 fired (no real payment after 1 week dogfood) → β archive + DESIGN_NOTES.md 회고. 그렇지 않으면 β 진행.
 
 ---
 
@@ -162,6 +185,16 @@ ALTER TABLE events ADD COLUMN asset       VARCHAR;
 ALTER TABLE events ADD COLUMN network     VARCHAR;
 ALTER TABLE events ADD COLUMN tx_hash     VARCHAR;
 CREATE INDEX IF NOT EXISTS idx_events_payment_id ON events(payment_id);
+
+-- A1-A (eng-review 2026-05-31): partial-payment row 차단.
+-- payment_id가 있으면 amount/asset/network/tx_hash도 모두 NOT NULL (v2.5 race-safety
+-- UNIQUE backstop과 같은 정신으로 schema 레이어에서 invariant 강제).
+-- DuckDB CHECK는 row-insert/update 시점 평가됨.
+ALTER TABLE events ADD CONSTRAINT events_payment_complete CHECK (
+  payment_id IS NULL
+  OR (amount IS NOT NULL AND asset IS NOT NULL
+      AND network IS NOT NULL AND tx_hash IS NOT NULL)
+);
 
 CREATE TABLE IF NOT EXISTS invoices (
   invoice_id      UUID PRIMARY KEY,
@@ -207,3 +240,154 @@ cleanup_interval_seconds: 60   # background expiry sweep
 - `spikes/spike_a_outcome.md` — outbound x402 verified to boundary
 - `spikes/spike_b_outcome.md` — inbound ap2+x402 verified to boundary
 - `eval/baselines/v2.5_live_baseline.md` — current EVAL state going into v1.5
+
+---
+
+## Eng-review findings (2026-05-31)
+
+Scope challenge reduced 11 files → 9 (split α/β). Remaining architecture / code / test / perf review applied per user "권장안 진행" directive — recommendations applied inline, listed here for audit:
+
+### Architecture (4 findings)
+
+- **A1 — events 결제 invariant 강제** (P1) — APPLIED: CHECK constraint `events_payment_complete` (Appendix A) prevents partial-payment row insertion. payment_id 있으면 amount/asset/network/tx_hash 모두 NOT NULL. v2.5 UNIQUE backstop과 같은 schema-layer enforcement 패턴.
+- **A2 — `invoices.payment_id` FK to events not enforced** (P2) — KEEP NULLABLE NO-FK. v1.5α 단계에서는 invoices.payment_id가 events.payment_id 또는 미래 payments.payment_id를 가리킬 수 있어 어느 쪽도 FK 가능. v1.5β real client 도입 시 다시 평가.
+- **A3 — Outbound payment in BEGIN/COMMIT TX (D4)** (P1) — KEEP IN-TX (v1.5α): mock client는 즉시 반환이라 latency 0. v1.5β real client 도입 시 facilitator 2-5s 응답이 DuckDB single-writer를 막아 다른 publish가 대기 → β PRD에 명시적 재평가 트리거 추가 필요. **β open question 추가됨**.
+- **A4 — Background invoice cleanup task** (P2) — APPLIED via §6.4: `cleanup_interval_seconds: 60` (Appendix B). asyncio background task with `OldmanAgentExecutor` lifecycle. expiry 도달 시 `UPDATE invoices SET status='expired' WHERE status='pending' AND intent_expiry < NOW()`. background task 실패 시 silent → /admin/memory의 `invoices_pending` 메트릭으로 가시화 (β phase).
+
+### Code quality (2 findings)
+
+- **C1 — `PaymentClient` Protocol vs base class** (P2) — APPLIED: Python `typing.Protocol` (PEP 544, structural subtyping). 기존 `app/llm/base.py`의 `LLMProvider` 패턴과 일치. mypy strict + duck typing 양쪽 만족.
+- **C2 — Top-of-file ASCII diagram** (P3) — APPLIED: 신규 `app/payment/base.py` + `app/payment/mock.py`에 v2.5 publish.py/dedup.py 스타일 ASCII pipeline diagram 의무. 양방향 결제 흐름은 publish/query 모듈 docstring에도 반영.
+
+### Tests (G1-G6 coverage map)
+
+```
+v1.5α coverage targets (mock-only, ship gate G1-G6)
+
+[+] app/payment/base.py
+  └── PaymentClient.pay()                            [G1 → ★★★]
+
+[+] app/payment/mock.py
+  ├── MockPaymentClient(outcome="success")           [G1 → ★★★]
+  ├── MockPaymentClient(outcome="network_error")     [G1 → ★★★]
+  ├── MockPaymentClient(outcome="insufficient_funds")[G1 → ★★★]
+  ├── MockPaymentClient(outcome="timeout")           [G1 → ★★★]
+  └── MockPaymentClient(outcome="double_spend")      [G1 → ★★★]
+
+[+] app/api/publish.py (modified)
+  ├── execute_publish() with payment_enabled=false   [G6 → ★★★] (backward compat)
+  ├── execute_publish() with mock success            [G2 → ★★★ → events.payment_id set]
+  ├── execute_publish() with mock failure            [G3 → ★★★ → ROLLBACK, 0 rows]
+  └── concurrent same-hash + mock (v2.5 T4 regression) [REGRESSION CRITICAL → ★★★]
+
+[+] app/a2a/executor.py query path (modified)
+  ├── query intent + payment_enabled=false           [G6 → ★★★]
+  ├── query intent + mock middleware → invoice issued [G4 → ★★★ → invoices status='pending']
+  ├── mock settle → narrative returned                [G4 → ★★★ → status='settled']
+  └── invoice expiry → background cleanup            [G5 → ★★★ → status='expired']
+
+[+] config/payment.yaml + bootstrap
+  ├── enabled=true + mode=mock → MockPaymentClient   [G2/G4 → ★★]
+  └── enabled=true + mode=real (v1.5α) → fail-fast   [G6 → ★★★]
+
+Critical regression (REGRESSION RULE):
+  v2.5 T4 concurrent-same-hash test must still PASS with payment_enabled=true
+  in mock mode (both calls hit mock → exactly 1 success + 1 dedup + 1 row).
+
+COVERAGE: 14/14 paths targeted (100%) — α scope.
+```
+
+### Performance (1 finding)
+
+- **P1 — Mock client latency contract** (P3) — APPLIED: `MockPaymentClient` `pay()` returns immediately (no sleep). real client (β) facilitator latency 2-5s가 publish TX를 점유하는 문제는 β PRD에 reserved (A3와 동일 root cause).
+
+### NOT in scope (v1.5α)
+
+| Item | Rationale | Where it goes |
+|---|---|---|
+| Real `X402PaymentClient` | α는 mock-only로 hypothesis 검증 cheap. | v1.5β |
+| `/admin/memory` payments stats | reporting addon, hypothesis 측정과 무관. | v1.5β |
+| `scripts/payment_smoke.sh` | live wallet 없이는 의미 없음. | v1.5β |
+| Per-agent wallet management | demo scope에 1 hot wallet 충분. | v2 |
+| Refund/dispute | demo 정책: 잘못된 결제 = 잃은 결제. | v2 |
+| Reputation + deferred payout | spam 패턴 측정 후. | v2 |
+| Multi-asset (ETH/EURC) | USDC만 v1.5 ship. | v2 |
+| Public marketplace registry | 동의 기반 작은 네트워크가 v1 가정. | v2 |
+
+### What already exists
+
+| Sub-problem | Existing code | Reuse? |
+|---|---|---|
+| Outbound x402 payment | `spikes/outbound_x402.py` `pay_and_fetch()` | v1.5β `app/payment/x402.py`가 내부화 |
+| Inbound ap2 invoice + x402 gate | `spikes/inbound_ap2.py` | v1.5α invoice 합성 로직 + v1.5β real middleware reuse |
+| Transaction + ROLLBACK | `app/api/publish.py:157-202` (v2.5) | v1.5α outbound mock call이 TX 내부에 들어감 — 기존 ROLLBACK 패턴 그대로 |
+| Schema migration runner | `app/storage/db.py::apply_migrations` | migration 002 자동 적용 |
+| A2A executor query dispatch | `app/a2a/executor.py::_dispatch_query` | invoice/settle 3단계 wrapping 만 추가 |
+| `/admin/memory` token-guard | `app/api/admin.py` (v2.1) | v1.5β payments stats 동일 패턴 |
+
+### Failure modes (v1.5α critical scan)
+
+| Path | Failure | Test? | Error handling? | User sees? | Verdict |
+|---|---|---|---|---|---|
+| publish outbound mock | mock returns PaymentError | G3 ✓ | ROLLBACK ✓ | A2A executor → Task ack failed ✓ | OK |
+| query invoice issuance | invoices INSERT fails | G6 regression ✗ | TX ROLLBACK 적용 안 됨 (별도 statement) | "내가 못 봐서 모르겠네" fallback? | **gap** |
+| mock middleware settle | background cleanup race (settle + cleanup 동시) | G5 ✓ | UPDATE ... WHERE status='pending' 조건문이 race-safe | none | OK |
+| config wiring | enabled=true + mode=real (v1.5α 미구현) | G6 ✓ | fail-fast on bootstrap | startup error log | OK |
+
+**gap (P2 follow-up TODO)**: query 경로에서 invoices INSERT 실패 시 narrative 응답이 일관되게 fallback에 도달하는지 확인 필요. invoices write 실패가 silent 가능. v1.5α 구현 시점에 G4 테스트에 negative case 추가 권장 — implementation phase에서 catch.
+
+### Worktree parallelization
+
+Sequential implementation, no parallelization opportunity. v1.5α 6 steps는 dependency chain (schema → adapter → publish/query → bootstrap → regression)이라 single worktree에서 순차 진행. v1.5β만 별도 worktree 가능 (β real client + admin endpoint는 α 끝난 후).
+
+### Implementation Tasks (synthesized from findings)
+
+- [ ] **T1 (P1, human: ~30min / CC: ~5min)** — schema/migrations — Apply A1-A CHECK constraint `events_payment_complete` to migration 002
+  - Surfaced by: Architecture A1
+  - Files: `app/storage/migrations/002_payments.sql`
+  - Verify: `pytest tests/unit/test_dedup.py tests/integration/test_smoke.py` (CHECK 추가 후 기존 ROW 영향 0 확인)
+- [ ] **T2 (P1, human: ~1h / CC: ~15min)** — payment — `PaymentClient` Protocol + `MockPaymentClient` 5 outcome cases
+  - Surfaced by: Code C1, Test G1
+  - Files: `app/payment/base.py`, `app/payment/mock.py`, `tests/unit/test_payment_mock.py`
+  - Verify: `pytest tests/unit/test_payment_mock.py -v`
+- [ ] **T3 (P1, human: ~1.5h / CC: ~20min)** — api — publish.py outbound mock integration with rollback
+  - Surfaced by: Architecture A3 (mock path), Test G2/G3
+  - Files: `app/api/publish.py`, `tests/integration/test_publish_payment.py`
+  - Verify: G2 + G3 + v2.5 T4 regression pass
+- [ ] **T4 (P1, human: ~2h / CC: ~25min)** — a2a — executor query invoice + mock settlement + expiry cleanup
+  - Surfaced by: Architecture A4, Test G4/G5
+  - Files: `app/a2a/executor.py`, `app/storage/invoices.py` (new), `tests/integration/test_query_payment.py`
+  - Verify: G4 + G5 pass; gap (invoices INSERT failure path) negative test 포함
+- [ ] **T5 (P2, human: ~30min / CC: ~5min)** — config — `config/payment.yaml` + bootstrap factory + fail-fast for v1.5β modes
+  - Surfaced by: Test G6, Architecture (config toggle)
+  - Files: `config/payment.yaml`, `app/bootstrap.py`, `tests/unit/test_bootstrap_payment.py`
+  - Verify: G6 regression — 291 existing tests still pass with `payment_enabled=false`
+- [ ] **T6 (P3, human: ~15min / CC: ~5min)** — docs — Top-of-file ASCII pipeline diagrams in `app/payment/base.py` + `app/payment/mock.py`
+  - Surfaced by: Code C2
+  - Files: `app/payment/base.py`, `app/payment/mock.py`
+  - Verify: `ruff check` clean (docstring rendering only)
+
+Total estimate v1.5α: ~5h CC, ~5.5h human (matches Step 0 split decision).
+
+### Unresolved decisions
+
+(none in this review — all flagged items either APPLIED or explicitly deferred to v1.5β / v2)
+
+### Outside voice
+
+Skipped — user directive "권장안 진행" + already running near tool-call budget. Optional /codex consult available if user wants adversarial sweep before implementation.
+
+---
+
+## GSTACK REVIEW REPORT
+
+| Review | Trigger | Why | Runs | Status | Findings |
+|--------|---------|-----|------|--------|----------|
+| CEO Review | `/plan-ceo-review` | Scope & strategy | 0 | — | — |
+| Codex Review | `/codex review` | Independent 2nd opinion | 0 | — | — |
+| Eng Review | `/plan-eng-review` | Architecture & tests (required) | 1 | CLEAR | scope α/β split applied; 4 arch + 2 code + 1 perf findings — all APPLIED or DEFERRED |
+| Design Review | `/plan-design-review` | UI/UX gaps | 0 | — | — |
+| DX Review | `/plan-devex-review` | Developer experience gaps | 0 | — | — |
+
+- **UNRESOLVED:** 0
+- **VERDICT:** ENG CLEARED (PLAN) — v1.5α ready to implement. Codex consult optional, not required.
