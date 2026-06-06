@@ -53,6 +53,8 @@ mypy app/
 - `app/reflection/scheduler.py` — reflection 생성 LLM 호출
 - `config/llm.yaml` — model tier routing (Haiku/Sonnet/Opus) + token budget per reflection / per query
 - 모든 `prompts/*.md` 파일
+- `app/api/publish.py` — v1.5α: 결제 wiring이 event 저장 경로를 분기. payment-applied vs free path narrative tone 변화 가능 → EVAL-2 재측정 (outside voice T7d).
+- `app/a2a/executor.py` — v1.5α: query dispatch에 invoice/settlement 단계 추가. fallback 응답("토큰이 부족하시구먼") narrative 일관성 EVAL-3 재측정.
 
 연관 EVAL:
 - **EVAL-1**: Reflection accuracy — golden set 5-10 cases, 동일 event set → 생성된 reflection이 actual content 반영
