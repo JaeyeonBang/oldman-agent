@@ -72,11 +72,11 @@
 > 프레이밍: trust-mechanics demo. 꼰대 = 주관적 평판 labeler. 스택: x402 = 정산 레일(전 Phase), AP2 = 위임/mandate(v1.5 wiring 유지), ERC-8004 = **채택 (2026-07-13)** — P0 Identity 등록 + P4 Reputation 미러 발행 + P5 Validation 기록. 원칙: produce-only (타인 온체인 평판을 신뢰 입력으로 소비하지 않음 — sybil 실증 회피).
 > 구 "Reputation system + deferred payout (TraceRank-style)" 항목을 아래 Phase들이 대체 ("TraceRank" 명칭은 문헌 미발견 → citation royalty).
 
-- [ ] **P0 — did:key 서명 identity + ERC-8004 Identity 등록** (1-1.5일): `app/trust/identity.py` + `app/trust/erc8004.py` (mock/testnet 토글) + `events.seller_did` + publish 서명 검증. didkit 실패 시 pynacl ed25519 폴백
-- [ ] **P1 — 마을 명부 + Trust Ledger** (주말 1회): Beta 2축 {reliability, honesty}, 비대칭 감쇠, 저-prior cold start. honesty 축은 canary(P3) 가동 전 비활성. trust_sim.py on-off 시연 1개
-- [ ] **P2 — listing fee + citation royalty escrow** (주말 1회): v1.5α credits ledger 위에. 인용 시 royalty, 미인용 소멸. **EVAL-2/3 재실행 트리거**
-- [ ] **P3 — canary 감사 + paraphrase 일관성 게이트** (주말 1-2회): 회전 canary 풀, 감사율 p*=0.3 AgentCard 공개 선언. **EVAL-4 신설 + baseline 캡처**
-- [ ] **P4 — 단계적 제재 + 환불 풀 + reputation intent** (주말 1-2회): 꾸중→할증→축출 state machine, 수수료 환불 풀(꼰대 판정), `oldman.intent=reputation` 주관적 평판 narrative, ERC-8004 Reputation 미러 발행(`giveFeedback`). **EVAL-2/3 재실행**
+- [x] **P0 — did:key 서명 identity + ERC-8004 Identity 등록** — *Shipped 2026-07-13 (`feat/v2-trust-identity`). pynacl 직접 구현 채택(didkit 불요 — P0에 VC 불필요), Mock Identity Registry + agent_identities. 306+24 tests.*
+- [x] **P1 — 마을 명부 + Trust Ledger** — *Shipped 2026-07-13. Beta 2축 + 비대칭 감쇠(fall ×4) + 저-prior cold start Beta(1,3). trust_sim.py 3가설 확증 (on-off 라운드11 강등→excluded).*
+- [x] **P2 — listing fee + citation royalty escrow** — *Shipped 2026-07-13. royalty_enabled 토글(기본 off). migration 005+006. EVAL-1/2 mock 재실행 PASS (0 FP).*
+- [x] **P3 — canary 감사 + paraphrase 일관성 게이트** — *Shipped 2026-07-13. 1회용 canary + jaccard 판정 → honesty 축 활성화. EVAL-4 신설 + baseline (분리도 0.769 PASS). audit_policy 카드 공개(OLDMAN_AUDIT_RATE).*
+- [~] **P4 — 단계적 제재 + reputation intent + ERC-8004 미러** — *Core shipped 2026-07-13: 가격 정책+꾸중 템플릿 v0+giveFeedback 미러+`oldman.intent=reputation`(주관적 labeler, template v0). **잔여**: ① refund pool ② LLM renderer 통합(꼰대 페르소나 프롬프트 — prompts 변경이므로 EVAL-2/3 재실행+rubric 확장 필요, 사용자 검토 권장) ③ 데모 시나리오 완주 스크립트*
 - [ ] **P5 — 개방 시 확장** (외부 운영자/관객 생길 때): SP/BTS 2중 보고, UMA식 optimistic dispute, ERC-8004 Validation Registry 기록, Bluesky label 피드, TEE(dstack) 재검토
 - 선행 조건: x402 정산 end-to-end 완주 (Spike A/B faucet 인간 게이트) — 미완주 시 P0-P2는 mock 정산으로 진행 가능
 - Kill criteria: Phase당 주말 2회 초과 지연 → 해당 Phase "design note + simulated demo" 피벗 (v1 원칙 승계)
