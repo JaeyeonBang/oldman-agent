@@ -76,8 +76,8 @@
 - [x] **P1 — 마을 명부 + Trust Ledger** — *Shipped 2026-07-13. Beta 2축 + 비대칭 감쇠(fall ×4) + 저-prior cold start Beta(1,3). trust_sim.py 3가설 확증 (on-off 라운드11 강등→excluded).*
 - [x] **P2 — listing fee + citation royalty escrow** — *Shipped 2026-07-13. royalty_enabled 토글(기본 off). migration 005+006. EVAL-1/2 mock 재실행 PASS (0 FP).*
 - [x] **P3 — canary 감사 + paraphrase 일관성 게이트** — *Shipped 2026-07-13. 1회용 canary + jaccard 판정 → honesty 축 활성화. EVAL-4 신설 + baseline (분리도 0.769 PASS). audit_policy 카드 공개(OLDMAN_AUDIT_RATE).*
-- [~] **P4 — 단계적 제재 + reputation intent + ERC-8004 미러** — *Core shipped 2026-07-13: 가격 정책+꾸중 템플릿 v0+giveFeedback 미러+`oldman.intent=reputation`(주관적 labeler, template v0). **잔여**: ① refund pool ② LLM renderer 통합(꼰대 페르소나 프롬프트 — prompts 변경이므로 EVAL-2/3 재실행+rubric 확장 필요, 사용자 검토 권장) ③ 데모 시나리오 완주 스크립트*
-- [ ] **P5 — 개방 시 확장** (외부 운영자/관객 생길 때): SP/BTS 2중 보고, UMA식 optimistic dispute, ERC-8004 Validation Registry 기록, Bluesky label 피드, TEE(dstack) 재검토
+- [x] **P4 — 단계적 제재 + reputation intent + 환불 풀 + ERC-8004 미러** — *Shipped 2026-07-13 (완료): 가격 정책+꾸중+giveFeedback 미러+`oldman.intent=reputation` / refund pool(migration 008) / LLM 페르소나 레이어(prompts/reputation_*.md, 마커 검증+template fallback — EVAL-2 mock 0 FP 재확인) / village_demo.py 7단계 완주. **후속**: 꼰대 발화 품질은 live LLM으로 EVAL-3 rubric 평가 권장 (현재 mock 검증만)*
+- [ ] **P5 — 개방 시 확장** (외부 운영자/관객 생길 때): SP/BTS 2중 보고, UMA식 optimistic dispute, ERC-8004 Validation Registry 기록, Bluesky label 피드, TEE(dstack) 재검토. *testnet 실등록 스크립트는 준비됨: `scripts/erc8004_register.py` (dry-run 검증 완료, `uv sync --extra chain` + env 후 --execute)*
 - 선행 조건: x402 정산 end-to-end 완주 (Spike A/B faucet 인간 게이트) — 미완주 시 P0-P2는 mock 정산으로 진행 가능
 - Kill criteria: Phase당 주말 2회 초과 지연 → 해당 Phase "design note + simulated demo" 피벗 (v1 원칙 승계)
 - [ ] 자율성 욕구 agent 통합 (별도 프로젝트 가능)
