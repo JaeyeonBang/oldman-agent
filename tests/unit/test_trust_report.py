@@ -29,6 +29,16 @@ def test_unknown_agent_report_says_unknown(
 def test_member_report_cites_trust_events(
     tmp_db: duckdb.DuckDBPyConnection,
 ) -> None:
+    # member 승격 게이트: honesty 증거(canary 통과) 1회 필요
+    record_trust_event(
+        tmp_db,
+        agent_id="kimbot",
+        criterion="honesty",
+        positive=True,
+        cause="canary_pass",
+        cause_ref="c-0",
+        now=T0,
+    )
     for i in range(6):
         record_trust_event(
             tmp_db,

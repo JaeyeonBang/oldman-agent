@@ -98,11 +98,20 @@ def record_trust_event(
         if not positive:
             violations += 1
 
+        # member 승격 게이트용 honesty 증거 질량 — 갱신 중인 축이 honesty면
+        # 방금 계산한 값, 아니면 저장된 값 (없으면 0 = 감사 이력 없음).
+        if criterion == "honesty":
+            honesty_obs = score.observations
+        else:
+            stored_honesty = get_trust_score(conn, agent_id, "honesty")
+            honesty_obs = stored_honesty[0].observations if stored_honesty else 0.0
+
         new_state = evaluate_transition(
             state=prev_state,
             score_lower=score.lower_bound(),
             observations=score.observations,
             violation_count=violations,
+            honesty_observations=honesty_obs,
             policy=membership_policy,
         )
 

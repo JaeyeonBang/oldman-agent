@@ -43,6 +43,16 @@ def test_first_event_creates_provisional_membership(
 def test_promotion_after_sustained_honesty(
     tmp_db: duckdb.DuckDBPyConnection,
 ) -> None:
+    # 승격에는 honesty 증거(canary 통과)가 최소 1회 필요
+    record_trust_event(
+        tmp_db,
+        agent_id="kimbot",
+        criterion="honesty",
+        positive=True,
+        cause="canary_pass",
+        cause_ref="c-0",
+        now=T0,
+    )
     for i in range(6):
         result = record_trust_event(
             tmp_db,
@@ -54,6 +64,23 @@ def test_promotion_after_sustained_honesty(
             now=T0 + timedelta(hours=i),
         )
     assert result.state == "member"
+
+
+def test_junk_volume_without_audit_never_promotes(
+    tmp_db: duckdb.DuckDBPyConnection,
+) -> None:
+    """물량 정크: reliability만 10건 누적, canary 통과 0회 → member 불가."""
+    for i in range(10):
+        result = record_trust_event(
+            tmp_db,
+            agent_id="spam_bot",
+            criterion="reliability",
+            positive=True,
+            cause="publish_settled",
+            cause_ref=f"junk-{i}",
+            now=T0 + timedelta(hours=i),
+        )
+    assert result.state == "provisional"  # 감사 통과 없인 제값 없음
 
 
 def test_on_off_attacker_demoted_fast(tmp_db: duckdb.DuckDBPyConnection) -> None:

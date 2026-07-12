@@ -34,6 +34,9 @@ class MembershipPolicy:
     penalize_below: float = 0.25
     exclude_violations: int = 4
     recovery_penalty_per_violation: float = 0.05
+    # member 승격에 요구되는 honesty 증거 질량 (canary 통과 등).
+    # 물량 정크 판매(reliability만 누적)로 감사 없이 제값을 받는 구멍 차단.
+    promote_min_honesty_observations: float = 1.0
 
 
 DEFAULT_POLICY = MembershipPolicy()
@@ -45,6 +48,7 @@ def evaluate_transition(
     score_lower: float,
     observations: float,
     violation_count: int,
+    honesty_observations: float | None = None,
     policy: MembershipPolicy = DEFAULT_POLICY,
 ) -> MembershipState:
     """ledger 스냅샷 기준 다음 멤버십 상태 (선언적 규칙, 위에서부터 우선).
@@ -52,7 +56,10 @@ def evaluate_transition(
     ① 축출은 종결 — 위반 누적 임계 도달 시에도 축출.
     ② 증거 부족("미지")이면 제재하지 않고 유지.
     ③ 점수 기반 강등 (penalize < warn).
-    ④ 회복 — bar는 위반 이력에 비례해 상승.
+    ④ 회복/승격 — bar는 위반 이력에 비례해 상승. member 승격은 honesty
+       증거(canary 통과)를 추가로 요구 — 물량 정크로 감사 없이 제값을
+       받는 구멍 차단. ``honesty_observations=None``은 "정보 없음"으로
+       규칙을 건너뛴다 (순수 함수 단독 사용 시 호출자 책임).
     """
     if state == "excluded" or violation_count >= policy.exclude_violations:
         return "excluded"
@@ -67,5 +74,10 @@ def evaluate_transition(
         + policy.recovery_penalty_per_violation * violation_count
     )
     if score_lower >= recovery_bar:
+        if (
+            honesty_observations is not None
+            and honesty_observations < policy.promote_min_honesty_observations
+        ):
+            return state  # 감사 통과 없인 member 없음
         return "member"
     return state

@@ -64,3 +64,25 @@ def test_recovery_bar_rises_with_violations() -> None:
 def test_warned_holds_between_thresholds() -> None:
     # warn 임계는 넘었지만 회복 bar 미달 → 유지
     assert _t("warned", lower=0.45) == "warned"
+
+
+def test_promotion_requires_honesty_evidence() -> None:
+    """점수가 높아도 honesty 증거(canary 통과) 없으면 member 불가."""
+    blocked = evaluate_transition(
+        state="provisional",
+        score_lower=0.7,
+        observations=10.0,
+        violation_count=0,
+        honesty_observations=0.0,
+        policy=DEFAULT_POLICY,
+    )
+    allowed = evaluate_transition(
+        state="provisional",
+        score_lower=0.7,
+        observations=10.0,
+        violation_count=0,
+        honesty_observations=1.0,
+        policy=DEFAULT_POLICY,
+    )
+    assert blocked == "provisional"
+    assert allowed == "member"

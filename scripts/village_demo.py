@@ -199,8 +199,20 @@ async def main() -> None:
     print(f"  claim {decision.status}: querier_zed에게 {decision.payout} 배상")
     print(f"  querier_zed 잔고: {get_balance(conn, 'querier_zed')}")
 
+    _banner("⑧ 회계 감사 — 자산 보존 invariant (돈이 새지 않았는가)")
+    from app.credits.audit import audit_credits
+
+    audit = audit_credits(conn)
+    print(
+        f"  Σ잔고={audit.total_balance} == Σ발행={audit.total_minted} "
+        f"→ {'OK' if audit.balanced else 'MISMATCH!'}"
+    )
+    print(f"  open escrow 부채: {audit.open_escrow_liability} / issues: {audit.issues}")
+
     conn.close()
-    print("\n✅ 완주 — 신뢰 메커니즘 7단계 전부 작동 (결정적, LLM/체인 불요)")
+    if not audit.balanced or audit.issues:
+        raise SystemExit("❌ 회계 감사 실패")
+    print("\n✅ 완주 — 신뢰 메커니즘 8단계 전부 작동 (결정적, LLM/체인 불요)")
 
 
 if __name__ == "__main__":

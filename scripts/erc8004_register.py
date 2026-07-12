@@ -100,9 +100,9 @@ def main() -> None:
         sys.exit(f"missing env: {', '.join(missing)}")
 
     try:
-        from erc8004.adapters import Web3Adapter
-        from erc8004.client import ERC8004Client
-        from erc8004.types import ContractAddresses
+        from erc8004.adapters import Web3Adapter  # type: ignore[import-untyped]
+        from erc8004.client import ERC8004Client  # type: ignore[import-untyped]
+        from erc8004.types import ContractAddresses  # type: ignore[import-untyped]
         from web3 import Web3
     except ImportError:
         sys.exit("erc-8004-py 미설치 — `uv sync --extra chain` 후 재실행")
