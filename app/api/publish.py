@@ -64,6 +64,8 @@ from app.storage.dedup import (
     tokenize,
 )
 from app.trust.identity import verify_payload
+from app.trust.payout import split_publish_payment
+from app.trust.service import record_trust_event
 
 OLDMAN_TREASURY_AGENT_ID = "oldman"
 
@@ -224,21 +226,33 @@ async def execute_publish(
         credits_tx_id: str | None = None
         if settings.payment_enabled and not settings.payment_kill_switch:
             try:
-                credits_tx = credits_transfer(
-                    conn,
-                    from_agent=OLDMAN_TREASURY_AGENT_ID,
-                    to_agent=req.source_agent,
-                    amount=settings.publish_reward,
-                    reason="publish_reward",
-                    event_id=event_id,
-                    starting_grant=settings.starting_grant,
-                )
+                if settings.royalty_enabled:
+                    # v2 P2: 분할 지급 — listing fee 즉시 + 잔액 escrow
+                    # (인용되면 royalty, 미인용 horizon 경과 시 소멸).
+                    payout = split_publish_payment(
+                        conn,
+                        settings,
+                        event_id=event_id,
+                        seller_agent=req.source_agent,
+                        now=ts,
+                    )
+                    credits_tx_id = payout.listing_fee_tx_id
+                else:
+                    credits_tx = credits_transfer(
+                        conn,
+                        from_agent=OLDMAN_TREASURY_AGENT_ID,
+                        to_agent=req.source_agent,
+                        amount=settings.publish_reward,
+                        reason="publish_reward",
+                        event_id=event_id,
+                        starting_grant=settings.starting_grant,
+                    )
+                    credits_tx_id = credits_tx.tx_id
             except InsufficientFundsError as e:
                 # Caught by outer `except Exception`, ROLLBACK, then
                 # re-raised. Re-raise as a PublishError subclass so
                 # executors map it like other publish blockers.
                 raise OldmanInsufficientFundsError() from e
-            credits_tx_id = credits_tx.tx_id
 
         evt_store.insert_event(
             conn,
@@ -286,6 +300,23 @@ async def execute_publish(
         with contextlib.suppress(duckdb.Error):
             conn.execute("ROLLBACK")
         raise
+
+    # 5.5. trust ledger — 정산된 매입만 reliability 증거가 된다 (거래-게이팅,
+    # v2 P1/P2 glue). weight는 거래 건당 1.0 — 거래액 가중은 value-imbalance
+    # 공격(소액 다수로 신뢰 축적)을 열므로 reliability 축에는 쓰지 않는다.
+    # best-effort 부가 기록: 실패해도 committed publish를 뒤집지 않는다.
+    if credits_tx_id is not None:
+        with contextlib.suppress(Exception):
+            record_trust_event(
+                conn,
+                agent_id=req.source_agent,
+                criterion="reliability",
+                positive=True,
+                weight=1.0,
+                cause="publish_settled",
+                cause_ref=event_id,
+                now=ts,
+            )
 
     # 6. background reflection
     if reflection_provider is not None and schedule_reflection is not None:

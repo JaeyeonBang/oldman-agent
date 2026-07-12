@@ -57,6 +57,7 @@ from app.storage.invoices import (
     mark_invoice_invalidated,
     mark_invoice_settled,
 )
+from app.trust.payout import release_royalties_for_citations
 
 _LOG = logging.getLogger(__name__)
 
@@ -282,8 +283,9 @@ class OldmanAgentExecutor(AgentExecutor):
 
         # v1.5 alpha — pay-to-query (PRD D5: invoice + settle separate TXs).
         # Skip entirely when disabled or kill-switch tripped.
+        settled_invoice_id: str | None = None
         if self.settings.payment_enabled and not self.settings.payment_kill_switch:
-            handled = await self._charge_querier_or_fallback(
+            handled, settled_invoice_id = await self._charge_querier_or_fallback(
                 question=question,
                 subject_agent=req.subject_agent,
                 querier_agent=filters.get("querier_agent"),
@@ -310,17 +312,48 @@ class OldmanAgentExecutor(AgentExecutor):
             )
             return
 
+        # v2 P2 — 정산된 query의 citation은 escrow royalty를 해제한다
+        # ("인용되면 지급"). 실패해도 이미 계산된 응답 전달을 막지 않는다.
+        royalties: list[dict[str, Any]] | None = None
+        if settled_invoice_id is not None and self.settings.royalty_enabled:
+            try:
+                releases = release_royalties_for_citations(
+                    self.conn,
+                    self.settings,
+                    citation_event_ids=[
+                        c.event_id for c in response.citations if c.event_id
+                    ],
+                    invoice_id=settled_invoice_id,
+                    now=datetime.now(UTC),
+                )
+                royalties = [
+                    {
+                        "event_id": r.event_id,
+                        "seller_agent": r.seller_agent,
+                        "amount": r.amount,
+                        "status": r.status,
+                    }
+                    for r in releases
+                ]
+            except Exception:
+                _LOG.exception("royalty release failed (invoice=%s)", settled_invoice_id)
+                royalties = [{"status": "error"}]
+
+        artifact_data: dict[str, Any] = {
+            "citations": [c.model_dump() for c in response.citations],
+            "is_cold_start": response.is_cold_start,
+            "used_fallback": response.used_fallback,
+            "retries_used": response.retries_used,
+        }
+        if royalties is not None:
+            artifact_data["royalties"] = royalties
+
         await emit_artifact(
             event_queue,
             task_id,
             context_id,
             text=response.answer,
-            data={
-                "citations": [c.model_dump() for c in response.citations],
-                "is_cold_start": response.is_cold_start,
-                "used_fallback": response.used_fallback,
-                "retries_used": response.retries_used,
-            },
+            data=artifact_data,
         )
         await emit_completed(event_queue, task_id, context_id)
 
@@ -335,9 +368,12 @@ class OldmanAgentExecutor(AgentExecutor):
         task_id: str,
         context_id: str,
         event_queue: EventQueue,
-    ) -> bool:
-        """Issue invoice + attempt ledger settlement. Returns True if a
-        fallback response was already emitted (caller must return).
+    ) -> tuple[bool, str | None]:
+        """Issue invoice + attempt ledger settlement.
+
+        Returns ``(handled, settled_invoice_id)`` — handled=True면 fallback
+        응답이 이미 emit됨 (caller must return). 정산 성공 시 invoice id를
+        돌려줘 citation royalty 해제(v2 P2)의 원인 ref로 쓴다.
 
         Per PRD D5, invoice and settlement are written in *separate*
         transactions so the audit row survives settlement failure.
@@ -349,7 +385,7 @@ class OldmanAgentExecutor(AgentExecutor):
                 context_id,
                 reason="missing_querier_agent",
             )
-            return True
+            return True, None
 
         invoice_id = str(uuid.uuid4())
         expiry = datetime.now(UTC) + timedelta(
@@ -399,9 +435,9 @@ class OldmanAgentExecutor(AgentExecutor):
                 context_id,
                 reason="querier_insufficient_funds",
             )
-            return True
+            return True, None
 
-        return False
+        return False, invoice_id
 
     async def _emit_insufficient_funds_fallback(
         self,

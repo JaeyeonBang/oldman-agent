@@ -234,7 +234,7 @@ class TestG4QueryPaymentSettles:
             judge_provider=None,
         )
         queue = _CapturingQueue()
-        handled = await executor._charge_querier_or_fallback(
+        handled, settled_invoice_id = await executor._charge_querier_or_fallback(
             question="agent_alice가 무엇을 했나요?",
             subject_agent="agent_alice",
             querier_agent="querier_zed",
@@ -243,6 +243,7 @@ class TestG4QueryPaymentSettles:
             event_queue=queue,
         )
         assert handled is False
+        assert settled_invoice_id is not None
 
         rows = tmp_db.execute(
             "SELECT status, credits_tx_id, settled_at FROM invoices"
@@ -279,7 +280,7 @@ class TestG5QueryPaymentInvalidated:
             judge_provider=None,
         )
         queue = _CapturingQueue()
-        handled = await executor._charge_querier_or_fallback(
+        handled, settled_invoice_id = await executor._charge_querier_or_fallback(
             question="알려줘",
             subject_agent="agent_alice",
             querier_agent="querier_broke",
@@ -288,6 +289,7 @@ class TestG5QueryPaymentInvalidated:
             event_queue=queue,
         )
         assert handled is True
+        assert settled_invoice_id is None
 
         rows = tmp_db.execute(
             "SELECT status FROM invoices"
@@ -313,7 +315,7 @@ class TestG5QueryPaymentInvalidated:
             judge_provider=None,
         )
         queue = _CapturingQueue()
-        handled = await executor._charge_querier_or_fallback(
+        handled, settled_invoice_id = await executor._charge_querier_or_fallback(
             question="who?",
             subject_agent=None,
             querier_agent=None,
@@ -322,6 +324,7 @@ class TestG5QueryPaymentInvalidated:
             event_queue=queue,
         )
         assert handled is True
+        assert settled_invoice_id is None
 
         invoices_count = tmp_db.execute(
             "SELECT count(*) FROM invoices"

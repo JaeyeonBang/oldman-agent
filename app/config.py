@@ -27,6 +27,10 @@ class Settings:
     # v2 P0 — trust identity. require=True면 무서명 publish 거부.
     require_signed_publish: bool = False
     erc8004_mode: str = "mock"
+    # v2 P2 — 층위 결제 (listing fee + citation royalty escrow).
+    royalty_enabled: bool = False
+    listing_fee_ratio: float = 0.2
+    escrow_horizon_days: int = 14
     # oldman 자신의 did:key seed (32B hex). 미설정 시 카드에 DID 미게재.
     oldman_did_seed: str | None = None
 
@@ -54,6 +58,14 @@ class Settings:
             in ("1", "true", "yes"),
             erc8004_mode=os.environ.get("OLDMAN_ERC8004_MODE", "mock"),
             oldman_did_seed=os.environ.get("OLDMAN_DID_SEED") or None,
+            royalty_enabled=os.environ.get("OLDMAN_ROYALTY_ENABLED", "false").lower()
+            in ("1", "true", "yes"),
+            listing_fee_ratio=float(
+                os.environ.get("OLDMAN_LISTING_FEE_RATIO", "0.2")
+            ),
+            escrow_horizon_days=int(
+                os.environ.get("OLDMAN_ESCROW_HORIZON_DAYS", "14")
+            ),
         )
 
 
