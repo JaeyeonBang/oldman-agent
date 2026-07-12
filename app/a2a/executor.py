@@ -28,6 +28,7 @@ from a2a.types.a2a_pb2 import Message
 from app.a2a.intents import (
     INTENT_PUBLISH,
     INTENT_QUERY,
+    INTENT_REPUTATION,
     extract_intent,
     get_data_part,
     get_text,
@@ -58,6 +59,7 @@ from app.storage.invoices import (
     mark_invoice_settled,
 )
 from app.trust.payout import release_royalties_for_citations
+from app.trust.report import build_reputation_report
 
 _LOG = logging.getLogger(__name__)
 
@@ -113,6 +115,8 @@ class OldmanAgentExecutor(AgentExecutor):
                 _LOG.info("query task %s cancelled", task_id)
             finally:
                 self._in_flight.pop(task_id, None)
+        elif intent == INTENT_REPUTATION:
+            await self._dispatch_reputation(message, task_id, context_id, event_queue)
         else:
             await emit_failed(
                 event_queue,
@@ -120,7 +124,8 @@ class OldmanAgentExecutor(AgentExecutor):
                 context_id,
                 (
                     "missing 'oldman.intent' metadata. "
-                    "Set message.metadata['oldman.intent'] to 'publish' or 'query'. "
+                    "Set message.metadata['oldman.intent'] to 'publish', 'query' "
+                    "or 'reputation'. "
                     "See agent-card skill descriptions for the contract."
                 ),
             )
@@ -354,6 +359,67 @@ class OldmanAgentExecutor(AgentExecutor):
             context_id,
             text=response.answer,
             data=artifact_data,
+        )
+        await emit_completed(event_queue, task_id, context_id)
+
+    # ── v2 P4: reputation intent ────────────────────────────────────────
+
+    async def _dispatch_reputation(
+        self,
+        message: Message,
+        task_id: str,
+        context_id: str,
+        event_queue: EventQueue,
+    ) -> None:
+        """"그 에이전트 어때?" — trust ledger 기반 주관적 평판 narrative.
+
+        template v0 (LLM 미사용). 발화는 주관적 labeler 프레이밍 + 전 주장
+        trust_events citation. 유료 (payment_enabled 시 query와 동일 과금).
+        """
+        await emit_submitted(event_queue, task_id, context_id)
+        filters = get_data_part(message) or {}
+        subject = filters.get("subject_agent") or get_text(message).strip()
+        if not subject or not isinstance(subject, str):
+            await emit_failed(
+                event_queue,
+                task_id,
+                context_id,
+                "reputation intent requires subject_agent (DataPart) or a TextPart",
+            )
+            return
+        await emit_working(event_queue, task_id, context_id)
+
+        if self.settings.payment_enabled and not self.settings.payment_kill_switch:
+            handled, _ = await self._charge_querier_or_fallback(
+                question=f"reputation:{subject}",
+                subject_agent=subject,
+                querier_agent=filters.get("querier_agent"),
+                task_id=task_id,
+                context_id=context_id,
+                event_queue=event_queue,
+            )
+            if handled:
+                return
+
+        report = build_reputation_report(self.conn, subject_agent=subject)
+        await emit_artifact(
+            event_queue,
+            task_id,
+            context_id,
+            text=report.text,
+            data={
+                "subject_agent": report.subject_agent,
+                "state": report.state,
+                "violation_count": report.violation_count,
+                "citations": [
+                    {
+                        "short_id": c.short_id,
+                        "trust_event_id": c.trust_event_id,
+                        "cause": c.cause,
+                    }
+                    for c in report.citations
+                ],
+            },
         )
         await emit_completed(event_queue, task_id, context_id)
 

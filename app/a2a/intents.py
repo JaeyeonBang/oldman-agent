@@ -21,6 +21,7 @@ from google.protobuf.json_format import MessageToDict  # type: ignore[import-unt
 
 INTENT_PUBLISH = "publish"
 INTENT_QUERY = "query"
+INTENT_REPUTATION = "reputation"  # v2 P4 — "그 에이전트 어때?" 평판 조회
 INTENT_METADATA_KEY = "oldman.intent"
 
 

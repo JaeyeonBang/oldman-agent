@@ -67,3 +67,34 @@ class MockERC8004IdentityRegistry:
 
     def get(self, agent_id: int) -> ERC8004Registration | None:
         return self._by_id.get(agent_id)
+
+
+@dataclass(frozen=True)
+class ERC8004Feedback:
+    agent_id: int
+    score: int  # 0-100 (EIP-8004 giveFeedback)
+    tag: str
+
+
+class MockERC8004ReputationRegistry:
+    """Reputation Registry 미러 (P4, produce-only).
+
+    ``giveFeedback(agentId, score, tag)`` 표면만 모사 — 꼰대의 제재/평판
+    판정을 발행한다. 타인의 온체인 피드백을 읽어 신뢰 입력으로 쓰는 API는
+    의도적으로 제공하지 않는다 (sybil 실증 회피 원칙).
+    """
+
+    def __init__(self) -> None:
+        self._feedbacks: list[ERC8004Feedback] = []
+
+    def give_feedback(
+        self, *, agent_id: int, score: int, tag: str
+    ) -> ERC8004Feedback:
+        if not 0 <= score <= 100:
+            raise ValueError(f"score must be 0-100, got {score}")
+        fb = ERC8004Feedback(agent_id=agent_id, score=score, tag=tag)
+        self._feedbacks.append(fb)
+        return fb
+
+    def feedbacks_for(self, agent_id: int) -> list[ERC8004Feedback]:
+        return [f for f in self._feedbacks if f.agent_id == agent_id]

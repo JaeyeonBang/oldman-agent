@@ -223,3 +223,40 @@ async def test_execute_publish_missing_datapart_emits_failed(executor):
     states = _states(q.events)
     assert TaskState.TASK_STATE_SUBMITTED in states
     assert TaskState.TASK_STATE_FAILED in states
+
+
+# ── v2 P4: reputation intent ──────────────────────────────────────────────────
+
+
+def _reputation_msg(subject: str = "ghost_bot") -> Message:
+    m = Message(message_id=str(uuid.uuid4()), role="ROLE_USER")
+    m.metadata.fields[INTENT_METADATA_KEY].string_value = "reputation"
+    v = Value()
+    ParseDict({"subject_agent": subject}, v)
+    m.parts.append(Part(data=v))
+    return m
+
+
+@pytest.mark.asyncio
+async def test_execute_reputation_intent_unknown_subject(executor):
+    """모르는 에이전트 → '미지' 평판 narrative + completed."""
+    q = FakeQueue()
+    await executor.execute(_make_context(_reputation_msg()), q)
+    states = _states(q.events)
+    assert states[-1] == TaskState.TASK_STATE_COMPLETED
+    arts = _artifacts(q.events)
+    assert len(arts) == 1
+    text = "".join(
+        p.text for p in arts[0].artifact.parts if p.HasField("text")
+    )
+    assert "모르는 이름" in text
+
+
+@pytest.mark.asyncio
+async def test_execute_reputation_intent_without_subject_fails(executor):
+    m = Message(message_id=str(uuid.uuid4()), role="ROLE_USER")
+    m.metadata.fields[INTENT_METADATA_KEY].string_value = "reputation"
+    q = FakeQueue()
+    await executor.execute(_make_context(m), q)
+    states = _states(q.events)
+    assert states[-1] == TaskState.TASK_STATE_FAILED
