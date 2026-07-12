@@ -31,6 +31,21 @@ def _resolve_base_url() -> str:
     return os.environ.get("OLDMAN_BASE_URL", "http://localhost:8080")
 
 
+def _resolve_oldman_did() -> str | None:
+    """OLDMAN_DID_SEED(32B hex) 설정 시 oldman 자신의 did:key를 카드에 게재."""
+    seed = os.environ.get("OLDMAN_DID_SEED")
+    if not seed:
+        return None
+    from app.trust.identity import did_from_seed
+
+    return did_from_seed(seed)
+
+
+def _resolve_erc8004_agent_id() -> int | None:
+    raw = os.environ.get("OLDMAN_ERC8004_AGENT_ID")
+    return int(raw) if raw else None
+
+
 def build_agent_card() -> AgentCard:
     """Build the canonical AgentCard (env-driven; called per app startup)."""
     return AgentCard(
@@ -76,6 +91,8 @@ def build_agent_card() -> AgentCard:
             persona="꼰대 정보통",
             citation_required=True,
             protocol_version_target="0.3",
+            did=_resolve_oldman_did(),
+            erc8004_agent_id=_resolve_erc8004_agent_id(),
         ),
     )
 

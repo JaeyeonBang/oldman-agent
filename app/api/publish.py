@@ -63,6 +63,7 @@ from app.storage.dedup import (
     payload_sha256,
     tokenize,
 )
+from app.trust.identity import verify_payload
 
 OLDMAN_TREASURY_AGENT_ID = "oldman"
 
@@ -94,6 +95,20 @@ class JaccardDuplicateError(PublishError):
 class ExactHashDuplicateError(PublishError):
     def __init__(self) -> None:
         super().__init__("deduplicated", "exact_hash")
+
+
+class InvalidSignatureError(PublishError):
+    """v2 P0: seller_did/payload_signature 쌍이 불완전하거나 검증 실패."""
+
+    def __init__(self) -> None:
+        super().__init__("blocked", "invalid_signature")
+
+
+class MissingSignatureError(PublishError):
+    """v2 P0: require_signed_publish=True인데 무서명 publish."""
+
+    def __init__(self) -> None:
+        super().__init__("blocked", "missing_signature")
 
 
 class OldmanInsufficientFundsError(PublishError):
@@ -172,6 +187,18 @@ async def execute_publish(
     if req.event_kind in BLOCKLISTED_KINDS:
         raise BlockedKindError()
 
+    # 1.5. seller 서명 검증 (v2 P0) — DID/서명 중 하나라도 오면 쌍 + 유효성 요구.
+    # citation [↑eXX]가 "누가 판 정보인가"의 암호학적 증명을 갖게 하는 지점.
+    if req.seller_did or req.payload_signature:
+        if (
+            not req.seller_did
+            or not req.payload_signature
+            or not verify_payload(req.seller_did, req.payload, req.payload_signature)
+        ):
+            raise InvalidSignatureError()
+    elif settings.require_signed_publish:
+        raise MissingSignatureError()
+
     # 2. compute hash + tokens
     p_hash = payload_sha256(req.payload)
     new_tokens = tokenize(req.payload)
@@ -223,6 +250,7 @@ async def execute_publish(
             payload=req.payload,
             payload_hash=p_hash,
             credits_tx_id=credits_tx_id,
+            seller_did=req.seller_did,
         )
         ent_store.append_episodic(
             conn,

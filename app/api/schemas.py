@@ -23,6 +23,10 @@ class PublishRequest(BaseModel):
     declared_source_type: SourceType
     payload: dict[str, Any]
     ts: datetime | None = None
+    seller_did: str | None = None
+    """판매자 did:key — payload_signature와 쌍으로 제공 (v2 P0 trust)."""
+    payload_signature: str | None = None
+    """payload_sha256에 대한 ed25519 서명 (base64)."""
 
 
 class PublishResponse(BaseModel):
@@ -69,6 +73,10 @@ class AgentCardOldmanExtension(BaseModel):
     persona: str
     citation_required: bool
     protocol_version_target: str = "0.2"
+    did: str | None = None
+    """oldman 자신의 did:key (v2 P0 — OLDMAN_DID_SEED 설정 시 게재)."""
+    erc8004_agent_id: int | None = None
+    """ERC-8004 Identity Registry agentId (mock/testnet 등록 시 게재)."""
 
 
 class Citation(BaseModel):

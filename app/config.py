@@ -24,6 +24,11 @@ class Settings:
     invoice_ttl_seconds: int = 300
     # Kill-switch (PRD D8 / outside voice T7c): trips ledger to noop + log.
     payment_kill_switch: bool = False
+    # v2 P0 — trust identity. require=True면 무서명 publish 거부.
+    require_signed_publish: bool = False
+    erc8004_mode: str = "mock"
+    # oldman 자신의 did:key seed (32B hex). 미설정 시 카드에 DID 미게재.
+    oldman_did_seed: str | None = None
 
     @classmethod
     def from_env(cls) -> Settings:
@@ -43,6 +48,12 @@ class Settings:
                 "OLDMAN_PAYMENT_KILL_SWITCH", "false"
             ).lower()
             in ("1", "true", "yes"),
+            require_signed_publish=os.environ.get(
+                "OLDMAN_REQUIRE_SIGNED_PUBLISH", "false"
+            ).lower()
+            in ("1", "true", "yes"),
+            erc8004_mode=os.environ.get("OLDMAN_ERC8004_MODE", "mock"),
+            oldman_did_seed=os.environ.get("OLDMAN_DID_SEED") or None,
         )
 
 

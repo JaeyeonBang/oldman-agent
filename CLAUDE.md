@@ -12,6 +12,7 @@ A2A 에이전트 생태계의 메타-기록자. 다른 에이전트들의 정보
 - **Stack**: Python (추정) + A2A SDK + ap2 + x402 + DuckDB (event store) + LLM (Haiku default, Opus for storytelling tier)
 - **Persona**: 꼰대 정보통 (1인칭 노년 화자, **inline citation 강제** — 모든 주장은 `[↑e42]` / `[↑r07]` ref 필수)
 - **Differentiator**: 양방향 결제. 꼰대가 정보를 사들이고(pay-to-share), narrative로 되판다(pay-to-query)
+- **v2 direction (확정 2026-07-13)**: Trust Layer "동네 사랑방 제도" — 꼰대 = 주관적 평판 labeler (정본 오라클 아님). Phase 0-5: did:key identity → 마을 명부+Beta trust ledger → listing fee+citation royalty escrow → canary 감사 → 단계적 제재+환불 풀+`oldman.intent=reputation`. 스택 역할 분담: **x402** = 정산 레일(전 Phase 기반), **AP2** = 위임/mandate(기존 v1.5 invoice wiring), **ERC-8004** = 채택(2026-07-13) — P0 Identity 등록, P4 Reputation 미러 발행, P5 Validation 기록. produce-only 원칙: 타인 온체인 평판을 신뢰 입력으로 소비하지 않음(sybil 실증 회피). 설계 근거: `research/agent-trust-impl-plan-2026-07.md`
 
 ## Where to find context
 
@@ -23,6 +24,8 @@ A2A 에이전트 생태계의 메타-기록자. 다른 에이전트들의 정보
 | `./TODOS.md` | Task tracking with pivot triggers + open questions |
 | `./memory.md` (49KB) | 학술 리서치: Multi-Agent System 종합 조사 (Generative Agents, MemGPT, A-MEM, SDT, Reactance 등 70+ 사례) |
 | `./memory2.md` (28KB) | 학술 리서치: "사회적 틀의 의인화" 선행 프로젝트 매핑 |
+| `./research/agent-trust-2026-07.md` | 신뢰성 판별 1차 리서치 (6트랙: ERC-8004/A2A·AP2·x402/DID·VC/평판/TEE/WoT + devil's advocate 검증) |
+| `./research/agent-trust-impl-plan-2026-07.md` | 2차 리서치 (메커니즘 디자인/능동 검증/제도) + v2 Trust Layer 구현 plan (Phase 0-5) |
 
 memory.md / memory2.md는 persona 작성·reflection 알고리즘 설계 시 참조 자료. 코드 reuse 없음.
 
@@ -55,11 +58,13 @@ mypy app/
 - 모든 `prompts/*.md` 파일
 - `app/api/publish.py` — v1.5α: 결제 wiring이 event 저장 경로를 분기. payment-applied vs free path narrative tone 변화 가능 → EVAL-2 재측정 (outside voice T7d).
 - `app/a2a/executor.py` — v1.5α: query dispatch에 invoice/settlement 단계 추가. fallback 응답("토큰이 부족하시구먼") narrative 일관성 EVAL-3 재측정.
+- `app/trust/**` — v2: trust ledger·canary·제재 로직 변경 시 EVAL-4 재실행. 제재/평판 발화(꾸중·할증·축출·`oldman.intent=reputation`)가 renderer/prompts에 추가되면 EVAL-2 + EVAL-3(제재 발화 rubric 포함) 재실행.
 
 연관 EVAL:
 - **EVAL-1**: Reflection accuracy — golden set 5-10 cases, 동일 event set → 생성된 reflection이 actual content 반영
 - **EVAL-2**: Citation grounding — 100 narrative response에서 hallucinated claim 비율 (목표: 0%, fail threshold 1%)
-- **EVAL-3**: Persona consistency — 꼰대 톤 일관성 (subjective rubric 또는 model-judge)
+- **EVAL-3**: Persona consistency — 꼰대 톤 일관성 (subjective rubric 또는 model-judge). v2에서 제재·평판 발화 rubric 추가
+- **EVAL-4** (v2 신설): Honesty 분리도 — 합성 정직/왜곡 판매자 세트에서 trust ledger honesty 점수의 분리도. baseline은 Phase 3 완료 시 캡처
 
 Baseline은 v1 ship 시점 fixed set으로 캡처.
 
@@ -118,3 +123,12 @@ When the user's request matches an available skill, invoke it via the Skill tool
 - A2A SDK pub/sub 패턴 존재 여부 → Spike A2A SDK quickstart에서 결정
 - pay-to-share / pay-to-query 단가 비율 → v1 ship 후 메트릭 기반 조정
 - 자율성 욕구 agent 인터페이스 약속 → v2 진입점에서 결정
+
+## graphify
+
+This project has a graphify knowledge graph at graphify-out/.
+
+Rules:
+- Before answering architecture or codebase questions, read graphify-out/GRAPH_REPORT.md for god nodes and community structure
+- If graphify-out/wiki/index.md exists, navigate it instead of reading raw files
+- After modifying code files in this session, run `graphify update .` to keep the graph current (AST-only, no API cost)
