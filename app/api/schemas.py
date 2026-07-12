@@ -77,6 +77,9 @@ class AgentCardOldmanExtension(BaseModel):
     """oldman 자신의 did:key (v2 P0 — OLDMAN_DID_SEED 설정 시 게재)."""
     erc8004_agent_id: int | None = None
     """ERC-8004 Identity Registry agentId (mock/testnet 등록 시 게재)."""
+    audit_policy: dict[str, Any] | None = None
+    """v2 P3 — 감사 정책 공개 선언 (공개가 비밀 감사보다 억지력이 큼).
+    예: {"canary": true, "deep_audit_rate": 0.3}."""
 
 
 class Citation(BaseModel):

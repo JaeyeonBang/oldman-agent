@@ -46,6 +46,16 @@ def _resolve_erc8004_agent_id() -> int | None:
     return int(raw) if raw else None
 
 
+def _resolve_audit_policy() -> dict[str, Any] | None:
+    """OLDMAN_AUDIT_RATE 설정 시 감사 정책을 카드에 공개 (v2 P3).
+
+    감사 게임 이론: 공개 선언된 무작위 감사가 비밀 감사보다 억지력이 크다."""
+    raw = os.environ.get("OLDMAN_AUDIT_RATE")
+    if not raw:
+        return None
+    return {"canary": True, "deep_audit_rate": float(raw)}
+
+
 def build_agent_card() -> AgentCard:
     """Build the canonical AgentCard (env-driven; called per app startup)."""
     return AgentCard(
@@ -93,6 +103,7 @@ def build_agent_card() -> AgentCard:
             protocol_version_target="0.3",
             did=_resolve_oldman_did(),
             erc8004_agent_id=_resolve_erc8004_agent_id(),
+            audit_policy=_resolve_audit_policy(),
         ),
     )
 
