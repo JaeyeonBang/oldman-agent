@@ -59,6 +59,7 @@ mypy app/
 - `app/api/publish.py` — v1.5α: 결제 wiring이 event 저장 경로를 분기. payment-applied vs free path narrative tone 변화 가능 → EVAL-2 재측정 (outside voice T7d).
 - `app/a2a/executor.py` — v1.5α: query dispatch에 invoice/settlement 단계 추가. fallback 응답("토큰이 부족하시구먼") narrative 일관성 EVAL-3 재측정.
 - `app/trust/**` — v2: trust ledger·canary·제재 로직 변경 시 EVAL-4 재실행. 제재/평판 발화(꾸중·할증·축출·`oldman.intent=reputation`)가 renderer/prompts에 추가되면 EVAL-2 + EVAL-3(제재 발화 rubric 포함) 재실행.
+- `app/narrative/reputation.py` — v2 P4: 평판 narrative LLM 레이어 (마커 검증 + template fallback). prompts/reputation_*.md와 함께 EVAL-2/3 트리거.
 
 연관 EVAL:
 - **EVAL-1**: Reflection accuracy — golden set 5-10 cases, 동일 event set → 생성된 reflection이 actual content 반영

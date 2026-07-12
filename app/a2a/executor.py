@@ -52,6 +52,7 @@ from app.api.schemas import PublishRequest, QueryRequest
 from app.config import Settings
 from app.credits.ledger import InsufficientFundsError
 from app.credits.ledger import transfer as credits_transfer
+from app.narrative.reputation import render_reputation_narrative
 from app.narrative.smalltalk import match_smalltalk
 from app.storage.invoices import (
     insert_pending_invoice,
@@ -403,15 +404,20 @@ class OldmanAgentExecutor(AgentExecutor):
                 return
 
         report = build_reputation_report(self.conn, subject_agent=subject)
+        # LLM 페르소나 레이어 — 마커 검증 실패/예외 시 template fallback
+        text, used_llm = await render_reputation_narrative(
+            self.narrative_provider, report
+        )
         await emit_artifact(
             event_queue,
             task_id,
             context_id,
-            text=report.text,
+            text=text,
             data={
                 "subject_agent": report.subject_agent,
                 "state": report.state,
                 "violation_count": report.violation_count,
+                "used_llm": used_llm,
                 "citations": [
                     {
                         "short_id": c.short_id,
