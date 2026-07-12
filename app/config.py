@@ -31,6 +31,8 @@ class Settings:
     royalty_enabled: bool = False
     listing_fee_ratio: float = 0.2
     escrow_horizon_days: int = 14
+    # v2 P4 — 환불 풀 (정산 query당 적립, 0이면 off).
+    refund_pool_fee: int = 0
     # oldman 자신의 did:key seed (32B hex). 미설정 시 카드에 DID 미게재.
     oldman_did_seed: str | None = None
 
@@ -66,6 +68,7 @@ class Settings:
             escrow_horizon_days=int(
                 os.environ.get("OLDMAN_ESCROW_HORIZON_DAYS", "14")
             ),
+            refund_pool_fee=int(os.environ.get("OLDMAN_REFUND_POOL_FEE", "0")),
         )
 
 

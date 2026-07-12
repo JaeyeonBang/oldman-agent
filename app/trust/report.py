@@ -79,10 +79,10 @@ def build_reputation_report(
         f"내가 보기엔 {subject_agent} 그놈은 {_STATE_VERDICTS[member.state]}."
     ]
     scores = []
-    for criterion, label in (("reliability", "거래"), ("honesty", "말")):
+    for criterion, label in (("reliability", "거래는"), ("honesty", "말은")):
         stored = get_trust_score(conn, subject_agent, criterion)
         if stored is not None:
-            scores.append(f"{label}은 열에 {round(stored[0].mean * 10)}쯤 믿네")
+            scores.append(f"{label} 열에 {round(stored[0].mean * 10)}쯤 믿네")
     if scores:
         parts.append(", ".join(scores) + ".")
     if member.violation_count > 0:

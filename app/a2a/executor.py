@@ -59,6 +59,7 @@ from app.storage.invoices import (
     mark_invoice_settled,
 )
 from app.trust.payout import release_royalties_for_citations
+from app.trust.refund_pool import accrue_pool_fee
 from app.trust.report import build_reputation_report
 
 _LOG = logging.getLogger(__name__)
@@ -502,6 +503,19 @@ class OldmanAgentExecutor(AgentExecutor):
                 reason="querier_insufficient_funds",
             )
             return True, None
+
+        # v2 P4 — 정산된 query의 환불 풀 수수료 적립 (best-effort, 자체 TX).
+        # 실패해도 정산 완료된 query 응답을 막지 않는다.
+        if self.settings.refund_pool_fee > 0:
+            try:
+                accrue_pool_fee(
+                    self.conn,
+                    self.settings,
+                    invoice_id=invoice_id,
+                    now=datetime.now(UTC),
+                )
+            except Exception:
+                _LOG.exception("pool fee accrual failed (invoice=%s)", invoice_id)
 
         return False, invoice_id
 
