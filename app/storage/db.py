@@ -8,6 +8,7 @@ is idempotent.
 
 from __future__ import annotations
 
+import contextlib
 import re
 from pathlib import Path
 
@@ -50,5 +51,15 @@ def apply_migrations(conn: duckdb.DuckDBPyConnection) -> None:
         if version in applied:
             continue
         sql = path.read_text(encoding="utf-8")
-        conn.execute(sql)
-        conn.execute("INSERT INTO _schema_version(version) VALUES (?)", [version])
+        # 마이그레이션 SQL과 버전 기록을 한 트랜잭션으로 — DuckDB는 문장별
+        # autocommit이라, wrap이 없으면 중간 실패 시 부분 반영 + 버전 미기록으로
+        # 스키마가 갈린다 (재실행도 실패). 원자화로 all-or-nothing 보장 (L2).
+        try:
+            conn.execute("BEGIN")
+            conn.execute(sql)
+            conn.execute("INSERT INTO _schema_version(version) VALUES (?)", [version])
+            conn.execute("COMMIT")
+        except Exception:
+            with contextlib.suppress(duckdb.Error):
+                conn.execute("ROLLBACK")
+            raise

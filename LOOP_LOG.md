@@ -152,3 +152,15 @@
 - **완료**: CRITICAL 3 + HIGH 4 + H1b + MEDIUM 6 + LOW 1(L3) = 15 커밋.
 - **전체 스위트**: 399 → 417 passed (신규 회귀 18건). ruff/mypy clean, village_demo 완주.
 - **남은 것(선택)**: L1(정책 판단), L2(마이그레이션 TX wrap, 데모 허용). 코드리뷰 실행 백로그는 전부 소진.
+
+## Loop 16 — L2 마이그레이션 원자성
+- **research**: apply_migrations가 conn.execute(sql) 후 버전 기록 — DuckDB는 문장별 autocommit이라 다중문 마이그레이션 중간 실패 시 부분 반영 + 버전 미기록으로 스키마 분기. 실측: 실패 마이그레이션의 zzz_partial 테이블이 남음.
+- **strategy**: 마이그레이션 SQL + 버전 기록을 한 BEGIN/COMMIT으로 원자화, 실패 시 ROLLBACK.
+- **plan**: apply_migrations 루프에 TX wrap. RED: 실패 마이그레이션 주입 → 부분 테이블 없음 + 버전 미기록.
+- **implement**: `app/storage/db.py`. test_db 회귀.
+- **review**: red(zzz_partial 잔존)→green(롤백). 전체 418 passed(기존 006/008 DROP+RENAME도 TX 내 정상), ruff/mypy clean.
+
+## 최종 (Loop 1-16, 2026-07-13)
+- **완료**: CRITICAL 3 + HIGH 4 + H1b + MEDIUM 6 + LOW 2(L2·L3) = 16 커밋. 코드리뷰 실행 가능 항목 전부 소진.
+- **전체 스위트**: 399 → 418 passed (신규 회귀 19건). ruff/mypy clean, village_demo 완주.
+- **남은 것**: L1(product 정책 결정 — jaccard 오탐→영구 축출이 의도인지 사용자 판단 필요, 코드 변경 아님).
