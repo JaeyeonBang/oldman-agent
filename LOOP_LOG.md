@@ -20,7 +20,7 @@
 | M3 | MEDIUM | adjudicate_claim TOCTOU (latent) | ✅ Loop 11 |
 | M4 | MEDIUM | accrue_pool_fee 멱등성 가드 없음 | ✅ Loop 12 |
 | M5 | MEDIUM | credits from/to 인덱스 마이그레이션에서 유실 | ✅ Loop 8 |
-| M6 | MEDIUM | record_trust_event 50줄 초과 | ⬜ |
+| M6 | MEDIUM | record_trust_event 50줄 초과 | ✅ Loop 13 |
 
 ---
 
@@ -116,3 +116,17 @@
 - **plan**: SELECT 1 가드. RED: 같은 invoice 2회 적립 → 잔고 +fee 1회만.
 - **implement**: `app/trust/refund_pool.py`. test 회귀.
 - **review**: red(grant+2)→green(grant+1). 전체 415 passed, ruff/mypy clean.
+
+## Loop 13 — M6 record_trust_event 복잡도 분리 (리팩터)
+- **research**: record_trust_event가 membership 조회+점수 decay/update+honesty 교차읽기+전이+3-write를 한 함수에 담아 프로젝트 50줄 가이드 초과.
+- **strategy**: 순수 read-only 계산 2개(_decayed_updated_score, _honesty_gate_observations)를 명명 헬퍼로 추출. 동작 보존이라 신규 테스트 없이 기존 415 스위트가 회귀 가드(Red-Green의 IMPROVE 단계).
+- **implement**: `app/trust/service.py` 헬퍼 2개 + 본문 슬림화. 남은 길이는 orchestration의 kwarg-per-line 포맷.
+- **review**: 전체 415 passed(동작 불변), ruff/mypy clean.
+
+---
+
+## 체크포인트 2 (Loop 1-13 완료, 2026-07-13)
+- **완료**: CRITICAL 3 (C1-C3) + HIGH 4 (H1-H4) + MEDIUM 6 (M1-M6). 커밋 13개.
+- **전체 스위트**: 399 → 415 passed (신규 회귀 16건). ruff/mypy clean 유지. village_demo 완주.
+- **남은 백로그**: H1b(agent_identities 등록/강제 — 등록 flow 설계 필요). LOW 3(L1 정책결정/L2 마이그레이션 TX/L3 admin 상수시간 비교)는 선택.
+- **다음 진입점**: H1b 또는 L3(hmac.compare_digest, trivial).
