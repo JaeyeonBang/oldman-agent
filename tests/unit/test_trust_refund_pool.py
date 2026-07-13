@@ -91,6 +91,41 @@ def test_claim_approved_pays_refund(tmp_db: duckdb.DuckDBPyConnection) -> None:
     assert row[1] is not None
 
 
+def test_adjudicate_claim_guards_against_double_pay_on_race(
+    tmp_db: duckdb.DuckDBPyConnection, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """M3 회귀 — pre-check와 UPDATE 사이에 동시 판정이 끼어들어도 이중 배상이
+    나면 안 된다. UPDATE가 status='pending' 가드로 레이스 패자를 거부해야 한다."""
+    import app.trust.refund_pool as rp
+
+    settings = _settings()
+    invoice_id = _settled_invoice(tmp_db)
+    accrue_pool_fee(tmp_db, settings, invoice_id=invoice_id, now=T0)
+    claim_id = file_claim(
+        tmp_db,
+        claimant_agent="querier_zed",
+        invoice_id=invoice_id,
+        reason_text="모순",
+        now=T0,
+    )
+
+    real_transfer = rp.credits_transfer
+
+    def racing_transfer(conn: object, **kw: object) -> object:
+        # 동시 판정이 먼저 승인한 상황 재현: 우리 UPDATE 직전에 status가 바뀜
+        tmp_db.execute(
+            "UPDATE refund_claims SET status='approved' WHERE claim_id = ?",
+            [claim_id],
+        )
+        return real_transfer(conn, **kw)  # type: ignore[arg-type]
+
+    monkeypatch.setattr(rp, "credits_transfer", racing_transfer)
+    with pytest.raises(ClaimError):
+        adjudicate_claim(
+            tmp_db, settings, claim_id=claim_id, justified=True, now=T0
+        )
+
+
 def test_claim_denied_pays_nothing(tmp_db: duckdb.DuckDBPyConnection) -> None:
     settings = _settings()
     invoice_id = _settled_invoice(tmp_db)

@@ -17,7 +17,7 @@
 | H4 | HIGH | state_changed_at이 비-전이 이벤트마다 joined_at으로 덮임 | ✅ Loop 5 |
 | M1 | MEDIUM | report.py mean 미decay 표시 | ✅ Loop 9 |
 | M2 | MEDIUM | canary used=TRUE가 trust event 전 커밋 | ✅ Loop 10 |
-| M3 | MEDIUM | adjudicate_claim TOCTOU (latent) | ⬜ |
+| M3 | MEDIUM | adjudicate_claim TOCTOU (latent) | ✅ Loop 11 |
 | M4 | MEDIUM | accrue_pool_fee 멱등성 가드 없음 | ⬜ |
 | M5 | MEDIUM | credits from/to 인덱스 마이그레이션에서 유실 | ✅ Loop 8 |
 | M6 | MEDIUM | record_trust_event 50줄 초과 | ⬜ |
@@ -102,3 +102,10 @@
 - **plan**: judge_canary_response 두 문장 순서 교체. RED: record_trust_event monkeypatch로 실패 → used 미소모 검증.
 - **implement**: `app/trust/canary.py`. test_trust_canary 회귀.
 - **review**: red(used=True 소모)→green(used=False). 전체 413 passed, ruff/mypy clean.
+
+## Loop 11 — M3 adjudicate_claim 레이스 가드
+- **research**: pre-check(SELECT status)와 UPDATE 사이 가드 부재. 두 동시 판정이 pre-check 통과 후 둘 다 UPDATE→이중 배상(sync route threadpool에서 실동시성). latent(현재 미wiring).
+- **strategy**: invoices.mark_invoice_settled 패턴 차용 — UPDATE에 AND status='pending' + RETURNING, 패자는 raise→rollback.
+- **plan**: 승인/거부 UPDATE 둘 다 가드. RED: credits_transfer monkeypatch로 UPDATE 직전 status 변경 재현 → ClaimError 기대.
+- **implement**: `app/trust/refund_pool.py`. test 회귀.
+- **review**: red(DID NOT RAISE)→green(ClaimError). 전체 414 passed, ruff/mypy clean.

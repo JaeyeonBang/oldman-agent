@@ -117,6 +117,9 @@ def adjudicate_claim(
 
     try:
         conn.execute("BEGIN")
+        # UPDATE에 status='pending' 가드 + RETURNING — pre-check와 UPDATE 사이에
+        # 동시 판정이 끼어들면(sync route는 threadpool에서 진짜 동시성) 레이스
+        # 패자를 거부해 이중 배상을 막는다 (M3, invoices.mark_invoice_settled와 동일 패턴).
         if justified:
             tx = credits_transfer(
                 conn,
@@ -127,20 +130,25 @@ def adjudicate_claim(
                 invoice_id=str(invoice_id),
                 starting_grant=settings.starting_grant,
             )
-            conn.execute(
+            won = conn.execute(
                 "UPDATE refund_claims SET status='approved', decided_ts=?, "
-                "payout_tx_id=? WHERE claim_id = ?",
+                "payout_tx_id=? WHERE claim_id = ? AND status='pending' "
+                "RETURNING claim_id",
                 [now, tx.tx_id, claim_id],
-            )
+            ).fetchone()
+            if won is None:
+                raise ClaimError(f"claim adjudication lost race: {claim_id}")
             decision = ClaimDecision(
                 claim_id=claim_id, status="approved", payout=settings.query_price
             )
         else:
-            conn.execute(
+            won = conn.execute(
                 "UPDATE refund_claims SET status='denied', decided_ts=? "
-                "WHERE claim_id = ?",
+                "WHERE claim_id = ? AND status='pending' RETURNING claim_id",
                 [now, claim_id],
-            )
+            ).fetchone()
+            if won is None:
+                raise ClaimError(f"claim adjudication lost race: {claim_id}")
             decision = ClaimDecision(claim_id=claim_id, status="denied", payout=0)
         conn.execute("COMMIT")
     except Exception:
