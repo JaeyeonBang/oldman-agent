@@ -129,4 +129,12 @@
 - **완료**: CRITICAL 3 (C1-C3) + HIGH 4 (H1-H4) + MEDIUM 6 (M1-M6). 커밋 13개.
 - **전체 스위트**: 399 → 415 passed (신규 회귀 16건). ruff/mypy clean 유지. village_demo 완주.
 - **남은 백로그**: H1b(agent_identities 등록/강제 — 등록 flow 설계 필요). LOW 3(L1 정책결정/L2 마이그레이션 TX/L3 admin 상수시간 비교)는 선택.
-- **다음 진입점**: H1b 또는 L3(hmac.compare_digest, trivial).
+- **다음 진입점**: H1b (등록 flow 설계 필요).
+
+## Loop 14 — L3 admin 토큰 상수시간 비교
+- **research**: `_check_token`이 `provided != expected` 평문 비교 → 첫 불일치 바이트 단락으로 타이밍 사이드채널. /admin/trust가 평판 내부 노출이라 토큰 load-bearing.
+- **strategy**: hmac.compare_digest로 상수시간화. 동작 동일(기존 토큰 가드 테스트가 가드).
+- **implement**: `app/api/admin.py` import hmac + 비교 교체.
+- **review**: 기존 admin 토큰 테스트 4개 통과(401/200 불변), 전체 415 passed, ruff/mypy clean.
+
+- **남은 것**: H1b(agent_identities 등록/강제 — 등록 flow 설계 필요), L1(정책 결정: jaccard 오탐→영구 축출 검토), L2(마이그레이션 명시 TX wrap, 데모 수준 허용).

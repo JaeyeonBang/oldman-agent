@@ -9,6 +9,7 @@ DuckDB 단일 writer 잠금 때문에 외부 프로세스로는 파일을 못 �
 
 from __future__ import annotations
 
+import hmac
 import json
 import os
 from typing import Any
@@ -27,7 +28,9 @@ def _check_token(request: Request) -> None:
         request.query_params.get("token")
         or request.headers.get("x-admin-token", "")
     )
-    if provided != expected:
+    # 상수시간 비교 — 평문 != 는 첫 불일치 바이트에서 단락돼 타이밍 사이드채널이
+    # 된다 (L3). /admin/trust가 평판 내부를 노출하므로 토큰은 load-bearing.
+    if not hmac.compare_digest(provided, expected):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail={"reason": "missing or invalid admin token"},
