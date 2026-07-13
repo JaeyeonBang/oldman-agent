@@ -61,6 +61,19 @@ def test_accrue_pool_fee(tmp_db: duckdb.DuckDBPyConnection) -> None:
     assert get_balance(tmp_db, VILLAGE_POOL_AGENT_ID) == settings.starting_grant + 1
 
 
+def test_accrue_pool_fee_is_idempotent(tmp_db: duckdb.DuckDBPyConnection) -> None:
+    """M4 회귀 — 같은 invoice로 두 번 적립해도 풀 잔고는 한 번만 늘어야 한다
+    (재시도/중복 호출 방어)."""
+    settings = _settings()
+    invoice_id = _settled_invoice(tmp_db)
+    accrue_pool_fee(tmp_db, settings, invoice_id=invoice_id, now=T0)
+    accrue_pool_fee(tmp_db, settings, invoice_id=invoice_id, now=T0)  # 중복 호출
+    assert (
+        get_balance(tmp_db, VILLAGE_POOL_AGENT_ID)
+        == settings.starting_grant + settings.refund_pool_fee
+    )
+
+
 def test_claim_approved_pays_refund(tmp_db: duckdb.DuckDBPyConnection) -> None:
     settings = _settings()
     invoice_id = _settled_invoice(tmp_db)

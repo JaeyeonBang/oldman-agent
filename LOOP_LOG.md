@@ -18,7 +18,7 @@
 | M1 | MEDIUM | report.py mean 미decay 표시 | ✅ Loop 9 |
 | M2 | MEDIUM | canary used=TRUE가 trust event 전 커밋 | ✅ Loop 10 |
 | M3 | MEDIUM | adjudicate_claim TOCTOU (latent) | ✅ Loop 11 |
-| M4 | MEDIUM | accrue_pool_fee 멱등성 가드 없음 | ⬜ |
+| M4 | MEDIUM | accrue_pool_fee 멱등성 가드 없음 | ✅ Loop 12 |
 | M5 | MEDIUM | credits from/to 인덱스 마이그레이션에서 유실 | ✅ Loop 8 |
 | M6 | MEDIUM | record_trust_event 50줄 초과 | ⬜ |
 
@@ -109,3 +109,10 @@
 - **plan**: 승인/거부 UPDATE 둘 다 가드. RED: credits_transfer monkeypatch로 UPDATE 직전 status 변경 재현 → ClaimError 기대.
 - **implement**: `app/trust/refund_pool.py`. test 회귀.
 - **review**: red(DID NOT RAISE)→green(ClaimError). 전체 414 passed, ruff/mypy clean.
+
+## Loop 12 — M4 accrue_pool_fee 멱등성
+- **research**: invoice당 pool_fee 중복 방지 가드 없음. 현재 1회 호출(non-live)이나 retry 경로 추가 시 이중 적립.
+- **strategy**: TX 내 존재 검사 — 같은 invoice의 pool_fee(applied)가 있으면 no-op.
+- **plan**: SELECT 1 가드. RED: 같은 invoice 2회 적립 → 잔고 +fee 1회만.
+- **implement**: `app/trust/refund_pool.py`. test 회귀.
+- **review**: red(grant+2)→green(grant+1). 전체 415 passed, ruff/mypy clean.

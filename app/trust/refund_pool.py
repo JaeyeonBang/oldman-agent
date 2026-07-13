@@ -51,6 +51,16 @@ def accrue_pool_fee(
         return None
     try:
         conn.execute("BEGIN")
+        # 멱등 가드 — 같은 invoice에 이미 pool_fee가 적립됐으면 no-op. 재시도
+        # 경로가 생겨도 이중 적립을 막는다 (M4).
+        already = conn.execute(
+            "SELECT 1 FROM credits_transactions "
+            "WHERE invoice_id = ? AND reason = 'pool_fee' AND outcome = 'applied'",
+            [invoice_id],
+        ).fetchone()
+        if already is not None:
+            conn.execute("COMMIT")
+            return None
         tx = credits_transfer(
             conn,
             from_agent=OLDMAN_TREASURY_AGENT_ID,
