@@ -73,7 +73,7 @@ def test_promotion_requires_honesty_evidence() -> None:
         score_lower=0.7,
         observations=10.0,
         violation_count=0,
-        honesty_observations=0.0,
+        honesty_quality=0.0,  # 감사 이력 없음 (mean 0) → 차단
         policy=DEFAULT_POLICY,
     )
     allowed = evaluate_transition(
@@ -81,7 +81,7 @@ def test_promotion_requires_honesty_evidence() -> None:
         score_lower=0.7,
         observations=10.0,
         violation_count=0,
-        honesty_observations=1.0,
+        honesty_quality=0.5,  # prior(0.25) 넘는 정직 증거 → 허용
         policy=DEFAULT_POLICY,
     )
     assert blocked == "provisional"

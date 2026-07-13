@@ -39,6 +39,29 @@ def test_empty_ledger_is_balanced(tmp_db: duckdb.DuckDBPyConnection) -> None:
     assert report.total_minted == 0
 
 
+def test_audit_flags_escrow_undercollateralization(
+    tmp_db: duckdb.DuckDBPyConnection,
+) -> None:
+    """F6 — open escrow 총액이 treasury 잔고를 초과하면 지급불능(solvent=False).
+
+    escrow는 별도 예치 계좌가 아니라 treasury에 남아 있으므로, treasury가 부채를
+    못 덮으면 royalty 방출이 나중에 InsufficientFunds로 실패한다. Σ보존만으로는
+    이 상태를 못 잡으므로(부채 초과여도 합은 맞음) 별도 지급능력 검증이 필요하다.
+    """
+    tmp_db.execute(
+        "INSERT INTO royalty_escrows "
+        "(event_id, seller_agent, amount, created_ts, expires_ts, status) "
+        "VALUES (?, 'kimbot', 1000, ?, ?, 'open')",
+        [str(uuid.uuid4()), T0, T0],
+    )
+    report = audit_credits(tmp_db)
+    assert report.balanced is True  # mint invariant는 별개로 성립
+    assert report.solvent is False
+    assert any(
+        "solven" in i.lower() or "escrow" in i.lower() for i in report.issues
+    )
+
+
 def test_transfers_preserve_assets(tmp_db: duckdb.DuckDBPyConnection) -> None:
     tmp_db.execute("BEGIN")
     transfer(

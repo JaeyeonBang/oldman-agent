@@ -18,6 +18,11 @@ from dataclasses import dataclass, field
 
 import duckdb
 
+# escrow는 별도 계좌가 아니라 treasury(oldman)에 남아 있으므로, treasury 잔고가
+# open escrow 부채를 덮어야 royalty를 실제 지급할 수 있다. (api.publish의
+# OLDMAN_TREASURY_AGENT_ID와 동일 — 레이어 의존 회피 위해 여기 상수로 둠.)
+_TREASURY_AGENT_ID = "oldman"
+
 
 @dataclass(frozen=True)
 class CreditsAudit:
@@ -25,6 +30,8 @@ class CreditsAudit:
     total_minted: int
     open_escrow_liability: int
     balanced: bool
+    treasury_balance: int = 0
+    solvent: bool = True
     issues: list[str] = field(default_factory=list)
 
 
@@ -56,6 +63,23 @@ def audit_credits(conn: duckdb.DuckDBPyConnection) -> CreditsAudit:
         "SELECT COALESCE(SUM(amount), 0) FROM royalty_escrows WHERE status='open'",
     )
 
+    # 지급능력(solvency) — treasury가 open escrow 부채를 덮는가. Σ보존(balanced)은
+    # 필요조건일 뿐: 부채 초과여도 합은 맞으므로 이 검증이 별도로 필요하다 (F6).
+    treasury_row = conn.execute(
+        "SELECT COALESCE(balance, 0) FROM credits_balances WHERE agent_id = ?",
+        [_TREASURY_AGENT_ID],
+    ).fetchone()
+    treasury_balance = (
+        int(treasury_row[0]) if treasury_row and treasury_row[0] is not None else 0
+    )
+    solvent = treasury_balance >= open_escrow_liability
+    if not solvent:
+        issues.append(
+            f"treasury insolvent for escrow: balance={treasury_balance} < "
+            f"open_escrow_liability={open_escrow_liability} "
+            f"(shortfall={open_escrow_liability - treasury_balance})"
+        )
+
     orphan_paid = conn.execute(
         "SELECT e.event_id FROM royalty_escrows e "
         "LEFT JOIN credits_transactions t "
@@ -70,5 +94,7 @@ def audit_credits(conn: duckdb.DuckDBPyConnection) -> CreditsAudit:
         total_minted=total_minted,
         open_escrow_liability=open_escrow_liability,
         balanced=balanced,
+        treasury_balance=treasury_balance,
+        solvent=solvent,
         issues=issues,
     )

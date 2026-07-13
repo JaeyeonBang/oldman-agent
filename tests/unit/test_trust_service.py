@@ -117,6 +117,37 @@ def test_stale_honesty_pass_does_not_promote_after_long_gap(
     assert result.state == "provisional"  # stale honesty로는 승격 못 함
 
 
+def test_canary_failure_blocks_promotion(
+    tmp_db: duckdb.DuckDBPyConnection,
+) -> None:
+    """F3 — 감사에서 거짓말한(canary_fail) 에이전트는 reliability가 아무리 좋아도
+    member 승격 불가. 게이트가 증거 '양'(observations)이 아니라 '질'(honesty
+    mean)을 봐야 한다 — canary 실패도 관측량은 늘리므로 양-게이트는 통과된다.
+    """
+    record_trust_event(
+        tmp_db,
+        agent_id="liar",
+        criterion="honesty",
+        positive=False,  # 감사에서 거짓말
+        cause="canary_fail",
+        cause_ref="c-0",
+        now=T0,
+    )
+    result = None
+    for i in range(10):  # reliability는 압도적으로 좋게
+        result = record_trust_event(
+            tmp_db,
+            agent_id="liar",
+            criterion="reliability",
+            positive=True,
+            cause="publish_settled",
+            cause_ref=f"evt-{i}",
+            now=T0 + timedelta(hours=i),
+        )
+    assert result is not None
+    assert result.state != "member"  # 거짓말쟁이는 승격 못 함
+
+
 def test_on_off_attacker_demoted_fast(tmp_db: duckdb.DuckDBPyConnection) -> None:
     """느리게 얻은 신뢰가 배신 3회에 무너진다 — 비대칭 동역학의 통합 검증."""
     for i in range(6):

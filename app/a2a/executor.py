@@ -332,6 +332,7 @@ class OldmanAgentExecutor(AgentExecutor):
                     ],
                     invoice_id=settled_invoice_id,
                     now=datetime.now(UTC),
+                    querier_agent=filters.get("querier_agent"),  # F2 self-citation 차단
                 )
                 royalties = [
                     {

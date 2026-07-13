@@ -160,6 +160,29 @@
 - **implement**: `app/storage/db.py`. test_db 회귀.
 - **review**: red(zzz_partial 잔존)→green(롤백). 전체 418 passed(기존 006/008 DROP+RENAME도 TX 내 정상), ruff/mypy clean.
 
+## Round 2 — 외부 아키텍처 검토 후속 (feat/v2-trust-round2)
+
+> 독립 아키텍트(fresh-eyes) 검토가 diff 범위 리뷰들이 놓친 구조적 결함 발견. F1-F8. 확인된 로직 홀부터 TDD 수정.
+
+### R2-1 — F2 royalty self-dealing 차단
+- **research**: `release_royalties_for_citations`가 querier 독립성 미검증 → 판매자가 자기 event를 자기 query로 인용해 escrow 전액 회수. "조작 정보는 deferred 수익 못 얻음" 논지 붕괴. corroboration은 self-corroboration 거부하는데 payout엔 없음.
+- **strategy**: querier_agent 인자 추가, seller==querier면 방출 스킵(escrow open 유지). 잔여 한계(단일 운영자 다계정)는 외부 신원 필요 → 데모 밖, 문서화.
+- **implement**: `payout.py` 가드 + `executor.py` querier 전달. RoyaltyRelease status에 skipped_self_citation.
+- **review**: red(TypeError)→green(escrow open 유지, 잔고 불변). 전체 419 passed, ruff/mypy clean.
+
+### R2-2 — F3 honesty 게이트를 질(quality) 기반으로
+- **research**: 승격 게이트가 honesty 증거 '양'(observations)을 봄. canary 실패도 beta+=4로 관측량↑(=4.0≥0.5) → 거짓말한 에이전트가 "감사받음" 게이트 통과. 실증: fail 후 obs=4.0 통과, 그러나 lower_bound=0.015.
+- **strategy**: 게이트를 감쇠 honesty mean(질)으로. 임계 0.3(prior 0.25 + 여유) — fresh pass(0.4) 통과, fail(0.125)·감사없음(0.0)·stale pass(→0.25+ε) 차단. pass 1회 ~108일 유효.
+- **implement**: `membership.py`(field/param/rule rename+recalibrate), `service.py`(_honesty_gate_quality: mean 반환). 테스트 인자명 갱신.
+- **review**: red(liar→member)→green(liar→provisional). C2 whitewash 테스트 보존. 전체 420 passed, ruff/mypy clean, EVAL-4 sep 0.769 PASS, trust_sim 적대 가설 a-e 전부 유지.
+
+### R2-3 — F6(a) treasury 지급능력(solvency) 검증
+- **research**: escrow는 별도 예치 계좌가 아니라 treasury에 남음(payout.py). audit의 Σ보존은 필요조건일 뿐 — 부채 초과여도 합은 맞아 지급불능을 못 잡음. treasury<open escrow면 royalty 방출이 나중에 InsufficientFunds.
+- **strategy**: audit_credits에 treasury_balance>=open_escrow_liability 검증 + solvent 필드/issue. (escrow를 실제 예치 계좌로 격리하는 것과 stale sweep은 더 큰 변경 → 후속 F6b/c.)
+- **implement**: `credits/audit.py` treasury_balance·solvent 필드 + 검증. parameterized query.
+- **review**: red(AttributeError)→green(solvent=False+issue). 전체 421 passed, ruff/mypy clean, village_demo 감사 balanced 유지.
+- **남은 R2 백로그**: F1(트러스트 루프 live 배선 — 배치 vs 인라인 의도 결정 필요), F4/L1(위반 감쇠/사면 — product), F5(TX 소유 규약 통일 — 리팩터), F6b/c(escrow 격리·sweep), F7(공유 conn lock), F8(TOFU 키 회전/폐기).
+
 ## 최종 (Loop 1-16, 2026-07-13)
 - **완료**: CRITICAL 3 + HIGH 4 + H1b + MEDIUM 6 + LOW 2(L2·L3) = 16 커밋. 코드리뷰 실행 가능 항목 전부 소진.
 - **전체 스위트**: 399 → 418 passed (신규 회귀 19건). ruff/mypy clean, village_demo 완주.
