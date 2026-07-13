@@ -64,8 +64,10 @@ from app.storage.dedup import (
     tokenize,
 )
 from app.storage.identities import get_agent_identity, upsert_agent_identity
+from app.storage.trust import get_membership
 from app.trust.identity import verify_payload
 from app.trust.payout import split_publish_payment
+from app.trust.sanctions import price_adjustment
 from app.trust.service import record_trust_event
 
 OLDMAN_TREASURY_AGENT_ID = "oldman"
@@ -122,6 +124,21 @@ class DidMismatchError(PublishError):
 
     def __init__(self) -> None:
         super().__init__("blocked", "did_mismatch")
+
+
+class ExcludedSellerError(PublishError):
+    """v2 F1: 축출된(excluded) 판매자의 publish 시도 — 사랑방 출입 금지 집행.
+
+    membership 상태기계가 판정한 'excluded'의 *집행*을 live publish 경로에
+    배선한 것(외부 아키텍처 검토 F1). price_adjustment(state).allowed=False인
+    상태(=excluded)는 event 저장도 결제도 없이 차단한다 — 제재가 실제로 '문다'.
+    honesty 부정 증거의 *생산*(canary/모순)은 신뢰된 운영자 surface의 몫이라
+    open publish에 노출하지 않는다(무기·farm 회피). 이 게이트는 그 생산이
+    도달시킨 축출을 강제하는 *방어* 원시명령이다.
+    """
+
+    def __init__(self) -> None:
+        super().__init__("blocked", "excluded_seller")
 
 
 class OldmanInsufficientFundsError(PublishError):
@@ -227,6 +244,13 @@ async def execute_publish(
             raise DidMismatchError()
     elif settings.require_signed_publish:
         raise MissingSignatureError()
+
+    # 1.6. 제재 집행 (v2 F1) — 축출된 판매자는 사랑방 출입 금지. membership
+    # 상태기계의 판정('excluded')을 live 경로에서 소비한다. 결제·저장 전에
+    # 차단해 side effect가 없다. 제재는 서명 유효성보다 우선.
+    member = get_membership(conn, req.source_agent)
+    if member is not None and not price_adjustment(member.state).allowed:
+        raise ExcludedSellerError()
 
     # 2. compute hash + tokens
     p_hash = payload_sha256(req.payload)

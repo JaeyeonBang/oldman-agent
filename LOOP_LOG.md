@@ -194,3 +194,13 @@
 - **implement**: `app/trust/canary.py` docstring only.
 - **review**: ruff clean, 전체 418 passed(불변), EVAL-4 separation 0.769 PASS(baseline 유지 — docstring이 결정적 eval에 무영향 실증).
 - **결과**: 코드리뷰 전 severity(C/H/M/L) 백로그 완전 종결. 큰 정책 변경(semantic judge/사면)은 여전히 별도 product 사이클.
+
+## Round 3 — 외부 아키텍처 검토 F1 인라인 배선 (사용자 선택: 인라인)
+
+### R3-1 — F1(part 1) 축출 집행을 live publish에 배선
+- **research**: 외부 검토 헤드라인 F1 — 감사→제재→환불 루프가 trust_sim/village_demo 스크립트에서만 돌고 live executor에 미배선. 실증: live 경로가 기록하는 유일 trust event는 publish 시 `reliability, positive=True`(긍정)뿐 → warned/penalized/excluded가 live에선 도달 불가 → 제재 상태기계 전체가 프로덕션 dead code. 게다가 도달해도 `price_adjustment(state).allowed=False`(excluded)가 publish에서 소비 안 됨 → 축출자가 여전히 판매·수령.
+- **설계 finding (다음 루프 형태 결정)**: honesty *부정 증거의 생산*(canary·모순)은 open publish 인터페이스에 노출하면 **무기·farm surface**가 된다 — 아무 publisher나 `contradicts_event_id`로 경쟁자 honesty를 깎고 escrow를 몰수시킬 수 있음. corroboration.py/canary.py docstring도 "판정은 신뢰된 운영자·검증 파이프라인이 공급, LLM 단독 심판 금지"라 명시. ∴ 생산은 **admin/운영자 surface**의 몫, open publish엔 배선 불가. 이번 루프는 안전한 *집행 원시명령*(축출 강제)만 배선.
+- **strategy**: publish 경로에 축출 게이트 인라인 — 결제·저장 전 `get_membership` → `price_adjustment(state).allowed` False면 `ExcludedSellerError`(status=blocked, reason=excluded_seller). side effect 없음, 서명 검증보다 우선. executor는 `except PublishError`가 이미 처리(무변경).
+- **implement**: `app/api/publish.py`(import get_membership+price_adjustment, ExcludedSellerError 클래스, 1.6 게이트), `tests/unit/test_publish_excluded.py`(3 케이스).
+- **review**: red(gate 무력화 시 2 failed — 축출자가 event 저장)→green. 전체 424 passed(+3), ruff/mypy clean, village_demo Σ400==400·EVAL-4 0.769 PASS·trust_sim a-e 전부 유지(회귀 없음 — 게이트는 excluded 멤버에만 발화, 데모 publisher는 축출 안 됨).
+- **남은 F1 후속**: (a) **admin honesty surface** — 운영자가 canary plant/judge·모순 판정을 호출해 부정 honesty 증거를 live 생산(그러면 이번 축출 게이트가 실제 발화). (b) **refund claim intent** — 구매자가 배상 청구하는 새 intent. (c) buy_multiplier 스케일링(provisional 0.5×/penalized 0.25×)은 전 publish 결제액을 재조정 → 회계 invariant 재검토 필요한 별도 pricing 증분.
