@@ -113,6 +113,33 @@ def _artifacts(events: list) -> list[TaskArtifactUpdateEvent]:
 
 
 @pytest.mark.asyncio
+async def test_settlement_generic_error_rolls_back_transaction(executor, monkeypatch):
+    """C3 회귀 — 정산 중 InsufficientFundsError가 *아닌* 예외가 나도 트랜잭션이
+    반드시 롤백되어, 공유 단일 writer 커넥션이 mid-transaction으로 남지 않아야
+    한다. 롤백을 안 하면 다음 요청의 BEGIN이 전부 실패해 서비스가 브릭된다.
+    """
+    import app.a2a.executor as ex_mod
+
+    def _boom(*args, **kwargs):
+        raise RuntimeError("boom during settlement")
+
+    monkeypatch.setattr(ex_mod, "credits_transfer", _boom)
+    q = FakeQueue()
+    with pytest.raises(RuntimeError):
+        await executor._charge_querier_or_fallback(
+            question="q",
+            subject_agent="agent_alice",
+            querier_agent="agent_carol",
+            task_id="t1",
+            context_id="c1",
+            event_queue=q,
+        )
+    # 커넥션이 열린 트랜잭션에 갇혀 있지 않아야 한다 — 새 BEGIN이 성공해야 함.
+    executor.conn.execute("BEGIN")
+    executor.conn.execute("COMMIT")
+
+
+@pytest.mark.asyncio
 async def test_execute_unknown_intent_emits_failed(executor):
     m = Message(message_id="m1", role="ROLE_USER")
     v = Value()

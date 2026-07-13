@@ -495,9 +495,14 @@ class OldmanAgentExecutor(AgentExecutor):
                 settled_at=datetime.now(UTC),
             )
             self.conn.execute("COMMIT")
-        except InsufficientFundsError:
+        except Exception as exc:
+            # 어떤 예외든 먼저 롤백 — 공유 단일 writer 커넥션이 열린 TX로 남으면
+            # 이후 모든 BEGIN이 실패해 서비스가 브릭된다. InsufficientFunds가
+            # 아니면(예: query_price=0 → InvalidAgentError) 정리 후 re-raise.
             with contextlib.suppress(duckdb.Error):
                 self.conn.execute("ROLLBACK")
+            if not isinstance(exc, InsufficientFundsError):
+                raise
             # Fresh TX so the invalidated marker persists.
             self.conn.execute("BEGIN")
             mark_invoice_invalidated(self.conn, invoice_id)

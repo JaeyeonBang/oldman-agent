@@ -9,7 +9,7 @@
 |----|--------|------|------|
 | C1 | CRITICAL | 타임존 skew가 decay 계산 손상 (get_conn에 SET TimeZone 없음) | ✅ Loop 1 |
 | C2 | CRITICAL | honesty 승격 게이트가 decay 안 된 stale 값 사용 (whitewash 우회) | ✅ Loop 2 |
-| C3 | CRITICAL | executor 정산 generic 예외 시 ROLLBACK 누락 → 커넥션 브릭 | ⬜ |
+| C3 | CRITICAL | executor 정산 generic 예외 시 ROLLBACK 누락 → 커넥션 브릭 | ✅ Loop 3 |
 | H1 | HIGH | 서명이 source_agent/메타데이터 미바인딩 → 결제 하이재킹 | ⬜ |
 | H2 | HIGH | seller_did/payload_signature 길이 무제한 → base58 DoS | ⬜ |
 | H3 | HIGH | publish_reward=0 → 매핑 안 된 예외로 crash | ⬜ |
@@ -36,3 +36,10 @@
 - **plan**: service.py에서 stored honesty decay 후 observations 사용. membership 임계 1.0→0.5("약 1 반감기(60일) 내 감사 1회"). RED: 400일 공백 승격 테스트.
 - **implement**: `app/trust/service.py` 게이트 분기 + `app/trust/membership.py` 임계. `test_stale_honesty_pass_does_not_promote_after_long_gap`.
 - **review**: red(member)→green(provisional). 임계 재보정으로 깨진 2개 기존 승격 테스트는 0.5로 복구(수 시간 gap→0.998>0.5). 전체 401 passed, ruff/mypy clean.
+
+## Loop 3 — C3 executor 정산 ROLLBACK 누락
+- **research**: `_charge_querier_or_fallback` Step 2가 `except InsufficientFundsError`만 롤백. 그 외 예외(InvalidAgentError 등)는 TX 열린 채 탈출 → 단일 writer 커넥션이 mid-TX로 남아 이후 BEGIN 전부 실패(서비스 브릭). 트리거: query_price=0.
+- **strategy**: 다른 모든 TX 함수와 동일하게 `except Exception: ROLLBACK` 후, InsufficientFundsError만 fallback 경로, 나머지는 re-raise.
+- **plan**: except 절 확장. RED: credits_transfer를 RuntimeError로 monkeypatch → 이후 BEGIN 성공 검증.
+- **implement**: `app/a2a/executor.py` except 절 + `test_settlement_generic_error_rolls_back_transaction`.
+- **review**: red("cannot start a transaction within a transaction")→green. 전체 402 passed, ruff/mypy clean.
