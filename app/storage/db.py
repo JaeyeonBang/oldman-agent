@@ -18,7 +18,12 @@ _VERSION_RE = re.compile(r"^(\d+)_.*\.sql$")
 
 
 def get_conn(db_path: str) -> duckdb.DuckDBPyConnection:
-    return duckdb.connect(db_path)
+    conn = duckdb.connect(db_path)
+    # 세션 타임존을 UTC로 고정. DuckDB 드라이버는 tz-aware datetime을 프로세스
+    # 로컬 TZ로 변환해 naive TIMESTAMP로 저장하므로, 비-UTC 호스트(예: KST)에서는
+    # offset만큼 skew가 생겨 decay 계산이 손상된다. UTC 고정으로 변환을 identity화.
+    conn.execute("SET TimeZone='UTC'")
+    return conn
 
 
 def _discover_migrations() -> list[tuple[int, Path]]:
