@@ -378,3 +378,86 @@ AgentCard skill description에 이 contract를 명시.
 - EVAL-1 mock 0.717 / EVAL-2 mock 0 hallucination
 - C1-C5 all PASS
 - 배포는 `fly.toml` + `scripts/deploy_fly.sh` + `scripts/post_deploy_verify.sh` 준비됨
+
+---
+
+## v1.5α — credits ledger pivot + hypothesis simulation (2026-06-01)
+
+### 1. 왜 credits로 피벗했는가
+
+`/plan-eng-review`의 outside voice critique가 4개 결정적 약점을 지적했고, 그 중 T4(off-ledger credits 대안)가 결정타:
+
+- **T1** "양방향 결제 토폴로지" 가설은 narrative differentiator지 architectural 아님 — 두 paywall 독립.
+- **T2** K1 (1주 dogfood 결제 0건 → archive)이 circular: α가 mock-only면 real-payment surface 자체가 없어서 K1 unfalsifiable.
+- **T3** Mock x402 client는 string-coded error 즉시 반환 — code 분기만 테스트, system 안 테스트. 진짜 위험(facilitator 5xx, on-chain latency, nonce, faucet) 안 잡힘.
+- **T4** Off-ledger credits: 1 table + 2 함수 + admin endpoint = ~2h. wallet/faucet/facilitator/chain 0. spam economics + 가치 차등 identical 측정. **이게 v1.5α의 본질.**
+
+x402 + ap2 인프라(Spike A/B verified)는 보존 — v1.5β cinematic shot용. credits가 hypothesis를 cheap + sharp 테스트한다.
+
+### 2. 구현 (PRD §11 T1-T7)
+
+| Task | 결과 | Commit |
+|---|---|---|
+| T1 migration 002 (credits_balances + credits_transactions + invoices + events.credits_tx_id) | fresh + prod-copy migration 둘 다 통과 | `1e9b272` |
+| T2 `app/credits/ledger.py` Ledger.transfer + lazy starting_grant + 9 unit tests | v2.5 T4 race-safety regression at credit layer 보존 | `1e9b272` |
+| T3 publish.py + executor.py wiring + 7 integration tests (G2-G5 + kill-switch) | DuckDB FK quirk 발견 → pay-first 패턴 우회 | `30ff8e6` + `afbb4fd` |
+| T4 `config/payment.yaml` + README env vars | 6 신규 OLDMAN_* env vars | `50c4da9` |
+| T5 G6 regression (`payment_enabled=false` 시 291+16 = 307 tests PASS) | backward compat 보존 | implicit |
+| T7 CLAUDE.md EVAL trigger 갱신 | publish.py + executor.py 추가 (T7d) | `50c4da9` |
+| T6 `scripts/credits_sim.py` 5-agent hypothesis simulation | 아래 §3 결과 | (next commit) |
+
+### 3. T6 simulation 결과 — PRD §4 hypothesis 측정
+
+5 agents × 5 unique publishes (phase 1) + 5 agents × (1 exact-dup + 1 near-dup) (phase 2) + 5×4 cross-queries (phase 3) + 1 unfunded query (phase 4).
+
+**Treasury trajectory** (oldman balance):
+```
+initial:                     0   (lazy-granted on first paid publish)
+after phase1 (25 paid):     75   (100 - 25 publish_reward)
+after phase2 (25 paid+blocked): 50   (75 - 25; near-dups stored)
+after phase3 (20 queries):  70   (50 + 20 query_price collected)
+after phase4 (rejected):    70   (unfunded query, no transfer)
+```
+
+**Hypothesis §4(a) — spam suppression**: PASS
+- 25/50 spam 시도 차단 (50% suppression rate)
+- 모두 Jaccard 단계 (exact dup도 Jaccard 1.0 → 차단). UNIQUE backstop 발동 0건 (single-process라 race 없음).
+- **insight**: Jaccard 0.9 threshold + 단어 token화는 "filler tail" 같은 novel token 추가에 취약. 50% 차단은 baseline — 결제 비용이 두 번째 deterrent로 보완.
+
+**Hypothesis §4(b) — value differential**: WEAK signal
+- 20 queries 모두 settled (각 agent가 100 starting_grant)
+- evidence_count 모두 10 (phase 1+2 모두 동일 publish 횟수 → 균질)
+- **insight**: 측정 도구는 작동하나 **simulation이 너무 균등해서 differential 안 보임**. 진짜 dogfood는 (a) 인기 agent vs unpopular agent, (b) query 깊이 차이가 있어야 함. PRD §4(b) 검증은 demo 운영자 dogfood 데이터로 미룸.
+
+**Phase 4 — unfunded querier**: PASS
+- balance 0 querier → invoice status='invalidated', no transfer
+- 검증: treasury가 가치 없는 query에 narrative 지급 안 함 (anti-abuse)
+
+### 4. v1.5α ship gate status (PRD §9)
+
+| Gate | Result | Notes |
+|---|---|---|
+| G1 ledger unit tests | ✓ 9/9 PASS | |
+| G2 publish payment applied | ✓ | events.credits_tx_id populated |
+| G3 publish insufficient → ROLLBACK | ✓ | 0 rows, 0 applied tx |
+| G4 query funded → settled | ✓ | invoice 'settled' + tx_id linked |
+| G5 query unfunded → invalidated | ✓ | fallback 응답 emit |
+| G6 backward compat (payment_enabled=false) | ✓ 307 tests PASS | |
+| G7 simulation hypothesis | ✓ §4(a) PASS, §4(b) weak | simulation evidence above |
+| G8 kill-switch | ✓ | OLDMAN_PAYMENT_KILL_SWITCH→noop |
+
+**Ready to merge to main.**
+
+### 5. v1.5β go/no-go (deferred decision)
+
+α를 ship한 뒤 1주 dogfood 측정:
+- (a) operator(본인)가 의도적으로 5-agent simulation을 실제 데모 네트워크에 적용해서 spam suppression 사례 ≥ 1건 확보
+- (b) cost vs value 산점도에서 진짜 differential 관측 (균질 데이터 아닌 dogfood data)
+
+이 둘 다 못 보면 **K1 발동** → β archive + cinematic-mock 피벗.
+
+### 6. Discovered architecture facts (구현 중 발견)
+
+- **DuckDB FK quirk**: `entities_episodic.event_id REFERENCES events(event_id)`가 같은 TX 안 events row UPDATE를 거부함. → pay-first 패턴 (`insert_event(credits_tx_id=...)`)으로 우회. PRD A1 CHECK constraint (`events_payment_complete`)는 schema에서 정의했지만, 사실 **FK 때문에 partial-payment row 자체가 불가능**. 자연 강제됨.
+- **Jaccard tokenize**: word-split 기반 → "filler tail" 같은 novel token이 distance 빨리 키움. 0.9 threshold는 exact-dup + light rewording만 잡음. credits 비용이 spam economics의 second-layer deterrent로 작동.
+- **Lazy starting_grant**: `_ensure_balance` on first touch → 운영자가 agent registration step 분리할 필요 없음. demo onboarding 매끄러움.

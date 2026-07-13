@@ -23,6 +23,13 @@ class PublishRequest(BaseModel):
     declared_source_type: SourceType
     payload: dict[str, Any]
     ts: datetime | None = None
+    seller_did: str | None = Field(default=None, max_length=128)
+    """판매자 did:key — payload_signature와 쌍으로 제공 (v2 P0 trust).
+
+    상한 128자: 실제 did:key ed25519는 ~56자. 무제한이면 base58 O(n^2) 디코드가
+    단일 writer 프로세스를 블록시키는 DoS 표면(H2)."""
+    payload_signature: str | None = Field(default=None, max_length=256)
+    """payload_sha256에 대한 ed25519 서명 (base64). 상한 256자(88자 실제)."""
 
 
 class PublishResponse(BaseModel):
@@ -69,6 +76,13 @@ class AgentCardOldmanExtension(BaseModel):
     persona: str
     citation_required: bool
     protocol_version_target: str = "0.2"
+    did: str | None = None
+    """oldman 자신의 did:key (v2 P0 — OLDMAN_DID_SEED 설정 시 게재)."""
+    erc8004_agent_id: int | None = None
+    """ERC-8004 Identity Registry agentId (mock/testnet 등록 시 게재)."""
+    audit_policy: dict[str, Any] | None = None
+    """v2 P3 — 감사 정책 공개 선언 (공개가 비밀 감사보다 억지력이 큼).
+    예: {"canary": true, "deep_audit_rate": 0.3}."""
 
 
 class Citation(BaseModel):

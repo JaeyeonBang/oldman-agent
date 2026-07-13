@@ -8,6 +8,7 @@ is idempotent.
 
 from __future__ import annotations
 
+import contextlib
 import re
 from pathlib import Path
 
@@ -18,7 +19,12 @@ _VERSION_RE = re.compile(r"^(\d+)_.*\.sql$")
 
 
 def get_conn(db_path: str) -> duckdb.DuckDBPyConnection:
-    return duckdb.connect(db_path)
+    conn = duckdb.connect(db_path)
+    # 세션 타임존을 UTC로 고정. DuckDB 드라이버는 tz-aware datetime을 프로세스
+    # 로컬 TZ로 변환해 naive TIMESTAMP로 저장하므로, 비-UTC 호스트(예: KST)에서는
+    # offset만큼 skew가 생겨 decay 계산이 손상된다. UTC 고정으로 변환을 identity화.
+    conn.execute("SET TimeZone='UTC'")
+    return conn
 
 
 def _discover_migrations() -> list[tuple[int, Path]]:
@@ -45,5 +51,15 @@ def apply_migrations(conn: duckdb.DuckDBPyConnection) -> None:
         if version in applied:
             continue
         sql = path.read_text(encoding="utf-8")
-        conn.execute(sql)
-        conn.execute("INSERT INTO _schema_version(version) VALUES (?)", [version])
+        # 마이그레이션 SQL과 버전 기록을 한 트랜잭션으로 — DuckDB는 문장별
+        # autocommit이라, wrap이 없으면 중간 실패 시 부분 반영 + 버전 미기록으로
+        # 스키마가 갈린다 (재실행도 실패). 원자화로 all-or-nothing 보장 (L2).
+        try:
+            conn.execute("BEGIN")
+            conn.execute(sql)
+            conn.execute("INSERT INTO _schema_version(version) VALUES (?)", [version])
+            conn.execute("COMMIT")
+        except Exception:
+            with contextlib.suppress(duckdb.Error):
+                conn.execute("ROLLBACK")
+            raise

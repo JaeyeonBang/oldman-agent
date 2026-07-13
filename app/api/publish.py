@@ -52,6 +52,8 @@ import duckdb
 
 from app.api.schemas import PublishRequest, PublishResponse
 from app.config import Settings
+from app.credits.ledger import InsufficientFundsError
+from app.credits.ledger import transfer as credits_transfer
 from app.reflection.scheduler import maybe_run_reflection
 from app.storage import entities as ent_store
 from app.storage import events as evt_store
@@ -61,6 +63,12 @@ from app.storage.dedup import (
     payload_sha256,
     tokenize,
 )
+from app.storage.identities import get_agent_identity, upsert_agent_identity
+from app.trust.identity import verify_payload
+from app.trust.payout import split_publish_payment
+from app.trust.service import record_trust_event
+
+OLDMAN_TREASURY_AGENT_ID = "oldman"
 
 # ── domain errors ───────────────────────────────────────────────────────────
 
@@ -90,6 +98,42 @@ class JaccardDuplicateError(PublishError):
 class ExactHashDuplicateError(PublishError):
     def __init__(self) -> None:
         super().__init__("deduplicated", "exact_hash")
+
+
+class InvalidSignatureError(PublishError):
+    """v2 P0: seller_did/payload_signature 쌍이 불완전하거나 검증 실패."""
+
+    def __init__(self) -> None:
+        super().__init__("blocked", "invalid_signature")
+
+
+class MissingSignatureError(PublishError):
+    """v2 P0: require_signed_publish=True인데 무서명 publish."""
+
+    def __init__(self) -> None:
+        super().__init__("blocked", "missing_signature")
+
+
+class DidMismatchError(PublishError):
+    """v2 H1b: source_agent가 이미 다른 DID로 등록됨 (TOFU 위반).
+
+    최초 서명 publish에서 바인딩된 source_agent↔DID와 다른 DID로 publish하려는
+    시도 — 등록 명의를 도용하거나 바꿔치기하려는 것이므로 거부한다."""
+
+    def __init__(self) -> None:
+        super().__init__("blocked", "did_mismatch")
+
+
+class OldmanInsufficientFundsError(PublishError):
+    """v1.5 alpha: oldman's credits balance cannot cover publish_reward.
+
+    Treats hypothesis-relevant info hard-failure (no event stored, no
+    payment) per outside voice T2 — surfacing the signal beats silent
+    degradation. ROLLBACK already runs via the publish TX wrapper.
+    """
+
+    def __init__(self) -> None:
+        super().__init__("blocked", "oldman_insufficient_funds")
 
 
 # ── reflection scheduling ───────────────────────────────────────────────────
@@ -156,6 +200,34 @@ async def execute_publish(
     if req.event_kind in BLOCKLISTED_KINDS:
         raise BlockedKindError()
 
+    # 1.5. seller 서명 검증 (v2 P0) — DID/서명 중 하나라도 오면 쌍 + 유효성 요구.
+    # citation [↑eXX]가 "누가 판 정보인가"의 암호학적 증명을 갖게 하는 지점.
+    if req.seller_did or req.payload_signature:
+        if (
+            not req.seller_did
+            or not req.payload_signature
+            or not verify_payload(
+                req.seller_did,
+                req.payload,
+                req.payload_signature,
+                req.source_agent,
+            )
+        ):
+            raise InvalidSignatureError()
+        # TOFU(H1b) — 최초 서명 publish에서 source_agent↔DID 바인딩, 이후 다른
+        # DID면 거부. 서명 검증 통과 후이므로 이 DID를 실제 소유함이 증명됐다.
+        # (publish TX 밖의 단건 upsert — 서명이 유효하면 dedup 결과와 무관하게
+        # 바인딩은 성립한다.)
+        registered = get_agent_identity(conn, req.source_agent)
+        if registered is None:
+            upsert_agent_identity(
+                conn, agent_id=req.source_agent, did=req.seller_did
+            )
+        elif registered.did != req.seller_did:
+            raise DidMismatchError()
+    elif settings.require_signed_publish:
+        raise MissingSignatureError()
+
     # 2. compute hash + tokens
     p_hash = payload_sha256(req.payload)
     new_tokens = tokenize(req.payload)
@@ -172,9 +244,43 @@ async def execute_publish(
     event_id = str(uuid.uuid4())
     ts = req.ts or datetime.now(UTC)
 
-    # 5. transaction
+    # 5. transaction — pay-first, then persist with credits_tx_id baked
+    # into the INSERT (DuckDB FK on entities_episodic.event_id blocks
+    # post-insert UPDATEs to events).
     try:
         conn.execute("BEGIN")
+
+        credits_tx_id: str | None = None
+        if settings.payment_enabled and not settings.payment_kill_switch:
+            try:
+                if settings.royalty_enabled:
+                    # v2 P2: 분할 지급 — listing fee 즉시 + 잔액 escrow
+                    # (인용되면 royalty, 미인용 horizon 경과 시 소멸).
+                    payout = split_publish_payment(
+                        conn,
+                        settings,
+                        event_id=event_id,
+                        seller_agent=req.source_agent,
+                        now=ts,
+                    )
+                    credits_tx_id = payout.listing_fee_tx_id
+                else:
+                    credits_tx = credits_transfer(
+                        conn,
+                        from_agent=OLDMAN_TREASURY_AGENT_ID,
+                        to_agent=req.source_agent,
+                        amount=settings.publish_reward,
+                        reason="publish_reward",
+                        event_id=event_id,
+                        starting_grant=settings.starting_grant,
+                    )
+                    credits_tx_id = credits_tx.tx_id
+            except InsufficientFundsError as e:
+                # Caught by outer `except Exception`, ROLLBACK, then
+                # re-raised. Re-raise as a PublishError subclass so
+                # executors map it like other publish blockers.
+                raise OldmanInsufficientFundsError() from e
+
         evt_store.insert_event(
             conn,
             event_id=event_id,
@@ -184,6 +290,8 @@ async def execute_publish(
             source_type=req.declared_source_type,
             payload=req.payload,
             payload_hash=p_hash,
+            credits_tx_id=credits_tx_id,
+            seller_did=req.seller_did,
         )
         ent_store.append_episodic(
             conn,
@@ -219,6 +327,23 @@ async def execute_publish(
         with contextlib.suppress(duckdb.Error):
             conn.execute("ROLLBACK")
         raise
+
+    # 5.5. trust ledger — 정산된 매입만 reliability 증거가 된다 (거래-게이팅,
+    # v2 P1/P2 glue). weight는 거래 건당 1.0 — 거래액 가중은 value-imbalance
+    # 공격(소액 다수로 신뢰 축적)을 열므로 reliability 축에는 쓰지 않는다.
+    # best-effort 부가 기록: 실패해도 committed publish를 뒤집지 않는다.
+    if credits_tx_id is not None:
+        with contextlib.suppress(Exception):
+            record_trust_event(
+                conn,
+                agent_id=req.source_agent,
+                criterion="reliability",
+                positive=True,
+                weight=1.0,
+                cause="publish_settled",
+                cause_ref=event_id,
+                now=ts,
+            )
 
     # 6. background reflection
     if reflection_provider is not None and schedule_reflection is not None:

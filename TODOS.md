@@ -1,6 +1,6 @@
 # TODOS — oldman_agent
 
-## Current state (2026-05-20 — v1.0.2)
+## Current state (2026-07-13 — v2 Trust Layer, PR #2 open)
 
 - PRD: `.claude/prds/oldman-agent-v1.prd.md` (Option A memory architecture)
 - Implementation plan (M1): `prompt_plan.md` (engineering-reviewed, T1-T8 applied)
@@ -15,6 +15,10 @@
 - [~] **M5 — Dogfood ship**: Docker Compose single-command + README polish + DESIGN_NOTES.md + bootstrap provider wiring. *Partial — 2026-05-20. Core v1 ship complete. Demo 영상은 인간 녹화 필요 → 사용자에게 위임.*
 - [x] **v1.0.1 — Plan debt resolution**: OpenRouter real provider + config-driven bootstrap + a2a-sdk adoption + /agent-card A2A v0.2 compliance. *Shipped 2026-05-20, 201/201 tests, ruff/mypy clean.*
 - [x] **v1.0.2 — Tier 1 polish**: Smart MockProvider (mode-aware) + CI workflow + pre-commit config + 꼰대 페르소나 토글 (OLDMAN_PERSONA). *Shipped 2026-05-20, 228+ tests, ≥93% coverage.*
+- [~] **v2 — Trust Layer("동네 사랑방 제도")**: P0 did:key 신원 + P1 Beta 신뢰 ledger/마을 명부 + P2 층위 결제·escrow + P3 canary/probe/모순 오라클 + P4 제재·환불 풀·평판 narrative + ERC-8004 produce-only + credits 회계 invariant. 다중 에이전트 코드리뷰 후 하드닝 16건(C1-3/H1-4+H1b/M1-6/L2-3) TDD 수정. *`feat/v2-trust-identity`, PR #2 open 2026-07-13, 418 tests, ruff/mypy clean, village_demo 완주. 루프 기록: `LOOP_LOG.md`.*
+  - [ ] L1 (product 판단): canary jaccard 오탐 → 영구 축출 정책 유지 여부 결정 (semantic judge/appeal 경로는 EVAL 재실행 유발 → 별도 사이클)
+  - [ ] ERC-8004 testnet 실등록 (`scripts/erc8004_register.py --execute`) — 사용자 게이트
+  - [ ] live EVAL-2/3 (OLDMAN_PERSONA=kkondae, OpenRouter) — 사용자 게이트
 
 ## M5 entry checklist (when starting M5)
 
@@ -66,9 +70,20 @@
 - [ ] Rolling credibility window — 결제 stake 생긴 후
 - [ ] OpenRouter 실제 비용 driven swap (메트릭 확보 후)
 
-## v2 (deferred)
+## v2 — Trust Layer "동네 사랑방 제도" (방향 확정 2026-07-13)
 
-- [ ] Reputation system + deferred payout (TraceRank-style)
+> 설계 근거: `research/agent-trust-2026-07.md` (1차 6트랙 + devil's advocate) + `research/agent-trust-impl-plan-2026-07.md` (2차 3트랙 + 구현 plan).
+> 프레이밍: trust-mechanics demo. 꼰대 = 주관적 평판 labeler. 스택: x402 = 정산 레일(전 Phase), AP2 = 위임/mandate(v1.5 wiring 유지), ERC-8004 = **채택 (2026-07-13)** — P0 Identity 등록 + P4 Reputation 미러 발행 + P5 Validation 기록. 원칙: produce-only (타인 온체인 평판을 신뢰 입력으로 소비하지 않음 — sybil 실증 회피).
+> 구 "Reputation system + deferred payout (TraceRank-style)" 항목을 아래 Phase들이 대체 ("TraceRank" 명칭은 문헌 미발견 → citation royalty).
+
+- [x] **P0 — did:key 서명 identity + ERC-8004 Identity 등록** — *Shipped 2026-07-13 (`feat/v2-trust-identity`). pynacl 직접 구현 채택(didkit 불요 — P0에 VC 불필요), Mock Identity Registry + agent_identities. 306+24 tests.*
+- [x] **P1 — 마을 명부 + Trust Ledger** — *Shipped 2026-07-13. Beta 2축 + 비대칭 감쇠(fall ×4) + 저-prior cold start Beta(1,3). trust_sim.py 3가설 확증 (on-off 라운드11 강등→excluded).*
+- [x] **P2 — listing fee + citation royalty escrow** — *Shipped 2026-07-13. royalty_enabled 토글(기본 off). migration 005+006. EVAL-1/2 mock 재실행 PASS (0 FP).*
+- [x] **P3 — canary 감사 + paraphrase 일관성 게이트** — *Shipped 2026-07-13. 1회용 canary + jaccard 판정 → honesty 축 활성화. EVAL-4 신설 + baseline (분리도 0.769 PASS). audit_policy 카드 공개(OLDMAN_AUDIT_RATE).*
+- [x] **P4 — 단계적 제재 + reputation intent + 환불 풀 + ERC-8004 미러** — *Shipped 2026-07-13 (완료): 가격 정책+꾸중+giveFeedback 미러+`oldman.intent=reputation` / refund pool(migration 008) / LLM 페르소나 레이어(prompts/reputation_*.md, 마커 검증+template fallback — EVAL-2 mock 0 FP 재확인) / village_demo.py 7단계 완주. **후속**: 꼰대 발화 품질은 live LLM으로 EVAL-3 rubric 평가 권장 (현재 mock 검증만)*
+- [ ] **P5 — 개방 시 확장** (외부 운영자/관객 생길 때): SP/BTS 2중 보고, UMA식 optimistic dispute, ERC-8004 Validation Registry 기록, Bluesky label 피드, TEE(dstack) 재검토. *testnet 실등록 스크립트는 준비됨: `scripts/erc8004_register.py` (dry-run 검증 완료, `uv sync --extra chain` + env 후 --execute)*
+- 선행 조건: x402 정산 end-to-end 완주 (Spike A/B faucet 인간 게이트) — 미완주 시 P0-P2는 mock 정산으로 진행 가능
+- Kill criteria: Phase당 주말 2회 초과 지연 → 해당 Phase "design note + simulated demo" 피벗 (v1 원칙 승계)
 - [ ] 자율성 욕구 agent 통합 (별도 프로젝트 가능)
 - [ ] 공개 A2A 마켓플레이스 지원
 - [ ] 월간 성격 테스트 ritual

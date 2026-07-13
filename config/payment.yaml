@@ -1,0 +1,54 @@
+# v1.5 alpha — credits-only, fully backward compatible default.
+#
+# At runtime the app reads payment configuration from environment
+# variables via Settings.from_env() (see app/config.py). This YAML is the
+# operator-facing reference: every key maps to one OLDMAN_* env var that
+# overrides the default. Set env vars at startup, or source from your
+# secret manager / docker-compose / fly.toml.
+#
+# v1.5 alpha ships ONLY mode=credits (off-chain ledger). The wallet/
+# network/asset/facilitator section is reserved for v1.5 beta when the
+# real x402 adapter lands. Leaving those keys here documents the future
+# surface — they have no effect under mode=credits.
+
+# Master switch. When false, the v1/v2 free-path is preserved bit-for-bit.
+# env: OLDMAN_PAYMENT_ENABLED (true|false), default false
+enabled: false
+
+# Adapter mode. credits = in-process ledger (v1.5 alpha).
+# x402_real reserved for v1.5 beta (will fail-fast in bootstrap if set
+# under alpha builds).
+mode: credits
+
+# Ledger economics. Hand-tuned for first dogfood; revisit after metrics.
+# env: OLDMAN_PUBLISH_REWARD (int credits, default 1)
+# env: OLDMAN_QUERY_PRICE (int credits, default 1)
+# env: OLDMAN_STARTING_GRANT (int credits, default 100; lazy-applied on
+#      first publish/query touch per agent_id)
+prices:
+  publish_reward: 1   # oldman -> source_agent on successful publish
+  query_price:    1   # querier -> oldman on successful narrative
+  starting_grant: 100 # per-agent lazy grant
+
+# Pay-to-query invoice lifetime before background sweep marks it expired.
+# env: OLDMAN_INVOICE_TTL_SECONDS (int, default 300 = 5 min)
+invoice_ttl_seconds: 300
+
+# Emergency exit (PRD D8 / outside voice T7c). When true the ledger is
+# bypassed completely (free path), even with enabled=true. Trip this if
+# a demo session goes sideways — no need to redeploy.
+# env: OLDMAN_PAYMENT_KILL_SWITCH (true|false), default false
+kill_switch: false
+
+# ─────────────────────────────────────────────────────────────────────
+# v1.5 beta reserve — NOT honored under mode=credits. Documented here
+# so operators can pre-stage wallet/secret manager fields before
+# upgrading. Setting these now under alpha is a no-op.
+# ─────────────────────────────────────────────────────────────────────
+wallet:
+  key_env: EVM_PRIVATE_KEY            # only read when mode=x402_real
+  receive_address_env: EVM_RECEIVE_ADDRESS
+network: eip155:84532                  # Base Sepolia
+asset: "0x036CbD53842c5426634e7929541eC2318f3dCF7e"   # USDC Base Sepolia
+facilitator_url: https://x402.org/facilitator
+credit_to_usdc_ratio: 0.001            # 1 credit = 0.001 USDC for mirror

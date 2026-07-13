@@ -239,6 +239,12 @@ uvicorn app.main:create_app --factory --port 8080 --workers 1
 | `OLDMAN_PERSONA` | `neutral` | 또는 `kkondae` (1인칭 노년 화자) |
 | `OLDMAN_ADMIN_TOKEN` | _(empty)_ | `/admin/memory` 토큰 가드 (없으면 공개) |
 | `OLDMAN_LOG_LEVEL` | `INFO` | DEBUG/WARNING/... |
+| `OLDMAN_PAYMENT_ENABLED` | `false` | v1.5α credits ledger 활성화. `false`면 v1/v2 free path 그대로 |
+| `OLDMAN_PUBLISH_REWARD` | `1` | publish 성공 시 oldman → source_agent에게 지급되는 credits |
+| `OLDMAN_QUERY_PRICE` | `1` | query 1건당 querier → oldman 지불 credits |
+| `OLDMAN_STARTING_GRANT` | `100` | agent 첫 결제 진입 시 lazy 부여되는 starting balance |
+| `OLDMAN_INVOICE_TTL_SECONDS` | `300` | pay-to-query invoice 만료 (background sweep) |
+| `OLDMAN_PAYMENT_KILL_SWITCH` | `false` | emergency exit — true 시 결제 우회 (PRD D8). 데모 사고 시 즉시 차단 |
 
 ## 8. Operations
 

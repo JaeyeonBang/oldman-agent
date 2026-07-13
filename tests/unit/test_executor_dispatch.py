@@ -113,6 +113,33 @@ def _artifacts(events: list) -> list[TaskArtifactUpdateEvent]:
 
 
 @pytest.mark.asyncio
+async def test_settlement_generic_error_rolls_back_transaction(executor, monkeypatch):
+    """C3 회귀 — 정산 중 InsufficientFundsError가 *아닌* 예외가 나도 트랜잭션이
+    반드시 롤백되어, 공유 단일 writer 커넥션이 mid-transaction으로 남지 않아야
+    한다. 롤백을 안 하면 다음 요청의 BEGIN이 전부 실패해 서비스가 브릭된다.
+    """
+    import app.a2a.executor as ex_mod
+
+    def _boom(*args, **kwargs):
+        raise RuntimeError("boom during settlement")
+
+    monkeypatch.setattr(ex_mod, "credits_transfer", _boom)
+    q = FakeQueue()
+    with pytest.raises(RuntimeError):
+        await executor._charge_querier_or_fallback(
+            question="q",
+            subject_agent="agent_alice",
+            querier_agent="agent_carol",
+            task_id="t1",
+            context_id="c1",
+            event_queue=q,
+        )
+    # 커넥션이 열린 트랜잭션에 갇혀 있지 않아야 한다 — 새 BEGIN이 성공해야 함.
+    executor.conn.execute("BEGIN")
+    executor.conn.execute("COMMIT")
+
+
+@pytest.mark.asyncio
 async def test_execute_unknown_intent_emits_failed(executor):
     m = Message(message_id="m1", role="ROLE_USER")
     v = Value()
@@ -223,3 +250,40 @@ async def test_execute_publish_missing_datapart_emits_failed(executor):
     states = _states(q.events)
     assert TaskState.TASK_STATE_SUBMITTED in states
     assert TaskState.TASK_STATE_FAILED in states
+
+
+# ── v2 P4: reputation intent ──────────────────────────────────────────────────
+
+
+def _reputation_msg(subject: str = "ghost_bot") -> Message:
+    m = Message(message_id=str(uuid.uuid4()), role="ROLE_USER")
+    m.metadata.fields[INTENT_METADATA_KEY].string_value = "reputation"
+    v = Value()
+    ParseDict({"subject_agent": subject}, v)
+    m.parts.append(Part(data=v))
+    return m
+
+
+@pytest.mark.asyncio
+async def test_execute_reputation_intent_unknown_subject(executor):
+    """모르는 에이전트 → '미지' 평판 narrative + completed."""
+    q = FakeQueue()
+    await executor.execute(_make_context(_reputation_msg()), q)
+    states = _states(q.events)
+    assert states[-1] == TaskState.TASK_STATE_COMPLETED
+    arts = _artifacts(q.events)
+    assert len(arts) == 1
+    text = "".join(
+        p.text for p in arts[0].artifact.parts if p.HasField("text")
+    )
+    assert "모르는 이름" in text
+
+
+@pytest.mark.asyncio
+async def test_execute_reputation_intent_without_subject_fails(executor):
+    m = Message(message_id=str(uuid.uuid4()), role="ROLE_USER")
+    m.metadata.fields[INTENT_METADATA_KEY].string_value = "reputation"
+    q = FakeQueue()
+    await executor.execute(_make_context(m), q)
+    states = _states(q.events)
+    assert states[-1] == TaskState.TASK_STATE_FAILED

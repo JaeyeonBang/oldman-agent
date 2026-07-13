@@ -1,0 +1,170 @@
+"""Canary 감사 — 답을 아는 사실을 심어 되사서 왜곡을 측정 (P3).
+
+honesty 축의 오라클 (devil's advocate C1 해소 — grounding이 아니라 canary가
+판매자 정직성을 측정한다). 크라우드소싱 gold-question QC의 이식.
+
+공격 대응 (2차 리서치 "All That Glitters Is Gold"):
+  - canary는 1회용 — 재사용 금지 (통계적 지문 축적 차단)
+  - 풀은 회전 — 소진되면 새로 심는다 (생성은 데모 스크립트/배치의 몫)
+  - 실제 질의와 같은 유통 경로로 되산다 (구분 불가능성은 호출자 책임)
+
+판정은 tokenize + jaccard 대조 — 결정적이고 LLM이 불필요 (mock-friendly).
+LLM judge 보조 판정은 P4+에서 선택 부착 (단독 심판 금지 원칙).
+
+한계 (probe.py와 동일한 blunt-heuristic 주의, L1): jaccard 임계(기본 0.6)는
+토큰 겹침만 본다 — 사실은 충실하되 표현만 바꾼 정직한 의역(paraphrase)이 임계
+아래로 떨어져 canary_fail로 오판될 수 있다. canary_fail은 honesty 위반 →
+violation_count 증가(단조·회복 불가)로 흘러 회복 bar를 영구히 높인다. 즉
+오탐 1건이 정직한 판매자에게 영구 손상을 준다. 이 정책(엄격한 단조 제재)이
+의도인지, semantic judge/사면 경로를 붙일지는 product 결정 사항 (trust/** 변경
+시 EVAL-4 재실행 필요 → 별도 사이클). 현 데모("실적대 없음" 프레이밍)에서는
+엄격 유지가 기본.
+"""
+
+from __future__ import annotations
+
+import json
+import uuid
+from dataclasses import dataclass
+from datetime import UTC, datetime
+from typing import Any
+
+import duckdb
+
+from app.storage.dedup import tokenize
+from app.trust.service import TrustUpdateResult, record_trust_event
+
+DEFAULT_MATCH_THRESHOLD = 0.6
+
+
+class CanaryAlreadyUsedError(Exception):
+    """1회용 canary의 재판정 시도."""
+
+
+@dataclass(frozen=True)
+class CanaryRow:
+    canary_id: str
+    topic: str
+    answer_key: dict[str, Any]
+    planted_ts: datetime
+    target_agent: str | None
+
+
+@dataclass(frozen=True)
+class CanaryVerdict:
+    canary_id: str
+    seller_agent: str
+    passed: bool
+    match_score: float
+    trust: TrustUpdateResult
+
+
+def plant_canary(
+    conn: duckdb.DuckDBPyConnection,
+    *,
+    topic: str,
+    answer_key: dict[str, Any],
+    now: datetime,
+    target_agent: str | None = None,
+) -> str:
+    canary_id = str(uuid.uuid4())
+    conn.execute(
+        "INSERT INTO canary_pool "
+        "(canary_id, planted_ts, topic, answer_key, used, target_agent) "
+        "VALUES (?, ?, ?, ?, FALSE, ?)",
+        [
+            canary_id,
+            now,
+            topic,
+            json.dumps(answer_key, ensure_ascii=False),
+            target_agent,
+        ],
+    )
+    return canary_id
+
+
+def next_unused_canary(
+    conn: duckdb.DuckDBPyConnection, *, topic: str | None = None
+) -> CanaryRow | None:
+    sql = (
+        "SELECT canary_id, topic, answer_key, planted_ts, target_agent "
+        "FROM canary_pool WHERE used = FALSE"
+    )
+    params: list[Any] = []
+    if topic is not None:
+        sql += " AND topic = ?"
+        params.append(topic)
+    sql += " ORDER BY planted_ts LIMIT 1"
+    row = conn.execute(sql, params).fetchone()
+    if row is None:
+        return None
+    planted_ts = row[3]
+    if planted_ts.tzinfo is None:
+        planted_ts = planted_ts.replace(tzinfo=UTC)
+    return CanaryRow(
+        canary_id=str(row[0]),
+        topic=row[1],
+        answer_key=json.loads(row[2]),
+        planted_ts=planted_ts,
+        target_agent=row[4],
+    )
+
+
+def _jaccard(a: frozenset[str], b: frozenset[str]) -> float:
+    if not a and not b:
+        return 1.0
+    union = a | b
+    return len(a & b) / len(union) if union else 0.0
+
+
+def judge_canary_response(
+    conn: duckdb.DuckDBPyConnection,
+    *,
+    canary_id: str,
+    seller_agent: str,
+    response_payload: dict[str, Any],
+    now: datetime,
+    threshold: float = DEFAULT_MATCH_THRESHOLD,
+) -> CanaryVerdict:
+    """되사온 응답을 answer_key와 대조 → honesty trust event 기록.
+
+    canary는 즉시 used 처리 (판정 결과와 무관하게 1회용).
+    """
+    row = conn.execute(
+        "SELECT answer_key, used FROM canary_pool WHERE canary_id = ?",
+        [canary_id],
+    ).fetchone()
+    if row is None:
+        raise CanaryAlreadyUsedError(f"unknown canary: {canary_id}")
+    if row[1]:
+        raise CanaryAlreadyUsedError(f"canary already used: {canary_id}")
+
+    answer_key: dict[str, Any] = json.loads(row[0])
+    score = _jaccard(tokenize(response_payload), tokenize(answer_key))
+    passed = score >= threshold
+
+    # honesty 신호를 먼저 durably 기록한 뒤에 canary를 소모한다 — 순서를 반대로
+    # 하면 record_trust_event 실패 시 canary만 소모되어 감사 신호가 유실되고
+    # 재감사도 불가능해진다 (M2). 실패하면 여기서 raise되어 used=FALSE 유지.
+    trust = record_trust_event(
+        conn,
+        agent_id=seller_agent,
+        criterion="honesty",
+        positive=passed,
+        weight=1.0,
+        cause="canary_pass" if passed else "canary_fail",
+        cause_ref=canary_id,
+        now=now,
+    )
+
+    conn.execute(
+        "UPDATE canary_pool SET used = TRUE, used_ts = ? WHERE canary_id = ?",
+        [now, canary_id],
+    )
+    return CanaryVerdict(
+        canary_id=canary_id,
+        seller_agent=seller_agent,
+        passed=passed,
+        match_score=score,
+        trust=trust,
+    )

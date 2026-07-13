@@ -1,0 +1,198 @@
+"""P0 — publish 경로 서명 검증 (TDD).
+
+시나리오:
+  ① 서명 publish → stored + events.seller_did 기록
+  ② 변조 서명 → InvalidSignatureError (blocked/invalid_signature)
+  ③ DID만 있고 서명 없음 → InvalidSignatureError
+  ④ require_signed_publish=True + 무서명 → MissingSignatureError
+  ⑤ legacy 무서명 publish (require=False) → stored, seller_did NULL (하위 호환)
+"""
+
+from __future__ import annotations
+
+import duckdb
+import pytest
+
+from app.api.publish import (
+    DidMismatchError,
+    InvalidSignatureError,
+    MissingSignatureError,
+    execute_publish,
+)
+from app.api.schemas import PublishRequest
+from app.config import Settings
+from app.trust.identity import generate_identity, sign_payload
+
+
+def _settings(**overrides: object) -> Settings:
+    base: dict[str, object] = {
+        "db_path": ":memory:",
+        "jaccard_window": 50,
+        "jaccard_threshold": 0.9,
+    }
+    base.update(overrides)
+    return Settings(**base)  # type: ignore[arg-type]
+
+
+def _req(payload: dict[str, object], **kw: object) -> PublishRequest:
+    return PublishRequest(
+        event_kind="anecdote",
+        source_agent="kimbot",
+        observed_agent="leebot",
+        declared_source_type="third_party",
+        payload=payload,
+        **kw,  # type: ignore[arg-type]
+    )
+
+
+@pytest.mark.asyncio
+async def test_signed_publish_stores_seller_did(
+    tmp_db: duckdb.DuckDBPyConnection,
+) -> None:
+    ident = generate_identity()
+    payload: dict[str, object] = {"text": "이봇이 약속을 지켰다"}
+    sig = sign_payload(ident.seed_hex, payload, "kimbot")
+    resp = await execute_publish(
+        tmp_db,
+        _settings(),
+        _req(payload, seller_did=ident.did, payload_signature=sig),
+    )
+    assert resp.status == "stored"
+    row = tmp_db.execute(
+        "SELECT seller_did FROM events WHERE event_id = ?", [resp.event_id]
+    ).fetchone()
+    assert row is not None
+    assert row[0] == ident.did
+
+
+@pytest.mark.asyncio
+async def test_tampered_signature_blocked(tmp_db: duckdb.DuckDBPyConnection) -> None:
+    ident = generate_identity()
+    sig = sign_payload(ident.seed_hex, {"text": "원본"}, "kimbot")
+    with pytest.raises(InvalidSignatureError):
+        await execute_publish(
+            tmp_db,
+            _settings(),
+            _req({"text": "변조"}, seller_did=ident.did, payload_signature=sig),
+        )
+    # 아무 event도 저장되지 않음
+    assert tmp_db.execute("SELECT COUNT(*) FROM events").fetchone()[0] == 0
+
+
+@pytest.mark.asyncio
+async def test_did_without_signature_blocked(
+    tmp_db: duckdb.DuckDBPyConnection,
+) -> None:
+    ident = generate_identity()
+    with pytest.raises(InvalidSignatureError):
+        await execute_publish(
+            tmp_db,
+            _settings(),
+            _req({"text": "x"}, seller_did=ident.did),
+        )
+
+
+@pytest.mark.asyncio
+async def test_signature_cannot_be_reused_under_different_source_agent(
+    tmp_db: duckdb.DuckDBPyConnection,
+) -> None:
+    """H1 — 서명은 payload뿐 아니라 source_agent(결제 수취자)에도 바인딩된다.
+
+    합법 판매자가 source_agent='kimbot'로 서명한 (did, payload, sig)를 공격자가
+    관측해 source_agent='carol'로 먼저 재제출하면(payload_hash 전역 UNIQUE 레이스),
+    결제·평판이 carol에게 귀속되는 하이재킹이 가능했다. 서명이 source_agent에
+    바인딩되면 재제출 시 검증이 실패해야 한다.
+    """
+    ident = generate_identity()
+    payload: dict[str, object] = {"text": "공유된 사실"}
+    sig = sign_payload(ident.seed_hex, payload, "kimbot")
+    # carol이 동일 (did, payload, sig)를 자기 이름으로 재제출
+    hijack = PublishRequest(
+        event_kind="anecdote",
+        source_agent="carol",
+        observed_agent="leebot",
+        declared_source_type="third_party",
+        payload=payload,
+        seller_did=ident.did,
+        payload_signature=sig,
+    )
+    with pytest.raises(InvalidSignatureError):
+        await execute_publish(tmp_db, _settings(), hijack)
+    assert tmp_db.execute("SELECT COUNT(*) FROM events").fetchone()[0] == 0
+
+
+@pytest.mark.asyncio
+async def test_first_signed_publish_registers_identity(
+    tmp_db: duckdb.DuckDBPyConnection,
+) -> None:
+    """H1b — 최초 서명 publish가 source_agent↔DID를 agent_identities에 등록(TOFU)."""
+    from app.storage.identities import get_agent_identity
+
+    ident = generate_identity()
+    payload: dict[str, object] = {"text": "첫 사실"}
+    sig = sign_payload(ident.seed_hex, payload, "kimbot")
+    await execute_publish(
+        tmp_db,
+        _settings(),
+        _req(payload, seller_did=ident.did, payload_signature=sig),
+    )
+    row = get_agent_identity(tmp_db, "kimbot")
+    assert row is not None
+    assert row.did == ident.did
+
+
+@pytest.mark.asyncio
+async def test_tofu_rejects_did_change_for_same_source_agent(
+    tmp_db: duckdb.DuckDBPyConnection,
+) -> None:
+    """H1b — 등록된 source_agent가 다른 DID로 publish 시도 → DidMismatchError.
+
+    최초 바인딩된 명의를 다른 키로 바꿔치기하는 것을 거부한다."""
+    ident_a = generate_identity()
+    ident_b = generate_identity()
+    p1: dict[str, object] = {"text": "첫 사실"}
+    await execute_publish(
+        tmp_db,
+        _settings(),
+        _req(
+            p1,
+            seller_did=ident_a.did,
+            payload_signature=sign_payload(ident_a.seed_hex, p1, "kimbot"),
+        ),
+    )
+    p2: dict[str, object] = {"text": "둘째 사실"}
+    with pytest.raises(DidMismatchError):
+        await execute_publish(
+            tmp_db,
+            _settings(),
+            _req(
+                p2,
+                seller_did=ident_b.did,
+                payload_signature=sign_payload(ident_b.seed_hex, p2, "kimbot"),
+            ),
+        )
+
+
+@pytest.mark.asyncio
+async def test_require_signed_publish_rejects_unsigned(
+    tmp_db: duckdb.DuckDBPyConnection,
+) -> None:
+    with pytest.raises(MissingSignatureError):
+        await execute_publish(
+            tmp_db,
+            _settings(require_signed_publish=True),
+            _req({"text": "x"}),
+        )
+
+
+@pytest.mark.asyncio
+async def test_legacy_unsigned_publish_still_works(
+    tmp_db: duckdb.DuckDBPyConnection,
+) -> None:
+    resp = await execute_publish(tmp_db, _settings(), _req({"text": "무서명 구버전"}))
+    assert resp.status == "stored"
+    row = tmp_db.execute(
+        "SELECT seller_did FROM events WHERE event_id = ?", [resp.event_id]
+    ).fetchone()
+    assert row is not None
+    assert row[0] is None

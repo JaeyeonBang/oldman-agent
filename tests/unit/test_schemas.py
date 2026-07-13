@@ -57,6 +57,33 @@ def test_publish_request_rejects_empty_event_kind() -> None:
         )
 
 
+def test_publish_request_rejects_oversized_seller_did() -> None:
+    """H2 회귀 — did:key는 ~56자. 무제한이면 base58 O(n^2) 디코드로 단일
+    writer 프로세스를 수십 초 블록시키는 DoS. 길이 상한으로 조기 거부."""
+    with pytest.raises(ValidationError):
+        PublishRequest(
+            event_kind="chat",
+            source_agent="a",
+            declared_source_type="self",
+            payload={},
+            seller_did="z" * 100_000,
+            payload_signature="c2ln",
+        )
+
+
+def test_publish_request_rejects_oversized_signature() -> None:
+    """H2 회귀 — base64(64B ed25519 sig)=88자. 무제한 금지."""
+    with pytest.raises(ValidationError):
+        PublishRequest(
+            event_kind="chat",
+            source_agent="a",
+            declared_source_type="self",
+            payload={},
+            seller_did="did:key:z6Mk",
+            payload_signature="A" * 100_000,
+        )
+
+
 def test_agent_card_alias_serialization() -> None:
     # v1.0.1: A2A v0.2 shape — url required, capabilities has streaming/push/state fields
     card = AgentCard(

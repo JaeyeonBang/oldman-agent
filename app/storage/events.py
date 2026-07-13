@@ -24,13 +24,24 @@ def insert_event(
     source_type: str,
     payload: dict[str, Any],
     payload_hash: str,
+    credits_tx_id: str | None = None,
+    seller_did: str | None = None,
 ) -> None:
     """Insert an L0 event row. Raises ``duckdb.ConstraintException`` if
-    ``payload_hash`` collides (T1)."""
+    ``payload_hash`` collides (T1).
+
+    ``credits_tx_id`` (v1.5 alpha): set when payment was applied earlier
+    in the same transaction. Pass at INSERT time rather than UPDATE
+    after — DuckDB's FK enforcement on ``entities_episodic.event_id``
+    blocks in-transaction UPDATEs to the events row.
+
+    ``seller_did`` (v2 P0): 서명 검증을 통과한 판매자 did:key. 무서명
+    legacy publish는 NULL."""
     conn.execute(
         "INSERT INTO events "
-        "(event_id, ts, kind, source_agent, source_type, payload_json, payload_hash) "
-        "VALUES (?, ?, ?, ?, ?, ?, ?)",
+        "(event_id, ts, kind, source_agent, source_type, payload_json, "
+        " payload_hash, credits_tx_id, seller_did) "
+        "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
         [
             event_id,
             ts,
@@ -39,6 +50,8 @@ def insert_event(
             source_type,
             json.dumps(payload, ensure_ascii=False),
             payload_hash,
+            credits_tx_id,
+            seller_did,
         ],
     )
 
