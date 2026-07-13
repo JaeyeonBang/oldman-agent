@@ -139,13 +139,21 @@ def record_trust_event(
             cause_ref=cause_ref,
             ts=ts,
         )
+        # 전이가 있으면 now, 없으면 기존 state_changed_at 보존 (마지막 실제 전이
+        # 시각을 유지 — joined_at으로 덮으면 감사 추적이 손상된다, H4).
+        if new_state != prev_state:
+            state_changed_at = ts
+        elif member is not None:
+            state_changed_at = member.state_changed_at
+        else:
+            state_changed_at = joined_at
         upsert_membership(
             conn,
             agent_id=agent_id,
             state=new_state,
             violation_count=violations,
             joined_at=joined_at,
-            state_changed_at=ts if new_state != prev_state else joined_at,
+            state_changed_at=state_changed_at,
         )
         conn.execute("COMMIT")
     except Exception:

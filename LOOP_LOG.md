@@ -13,7 +13,7 @@
 | H1 | HIGH | 서명이 source_agent/메타데이터 미바인딩 → 결제 하이재킹 | ⬜ |
 | H2 | HIGH | seller_did/payload_signature 길이 무제한 → base58 DoS | ✅ Loop 4 |
 | H3 | HIGH | publish_reward=0 → 매핑 안 된 예외로 crash | ⬜ |
-| H4 | HIGH | state_changed_at이 비-전이 이벤트마다 joined_at으로 덮임 | ⬜ |
+| H4 | HIGH | state_changed_at이 비-전이 이벤트마다 joined_at으로 덮임 | ✅ Loop 5 |
 | M1 | MEDIUM | report.py mean 미decay 표시 | ⬜ |
 | M2 | MEDIUM | canary used=TRUE가 trust event 전 커밋 | ⬜ |
 | M3 | MEDIUM | adjudicate_claim TOCTOU (latent) | ⬜ |
@@ -50,3 +50,10 @@
 - **plan**: schemas.py Field(max_length=…). RED: 100K자 필드 → ValidationError.
 - **implement**: `app/api/schemas.py` 2필드. `test_publish_request_rejects_oversized_{seller_did,signature}`.
 - **review**: red(통과)→green(거부). 전체 404 passed, ruff/mypy clean.
+
+## Loop 5 — H4 state_changed_at 보존
+- **research**: `service.py`가 비-전이 이벤트에서 state_changed_at을 joined_at으로 리셋 → "마지막 전이 시각"이 아니라 "최근 비-전이 이벤트 시각"을 추적하게 됨. 승격(17:00) 후 평범한 이벤트가 12:00(joined)으로 덮음. 감사 필드 손상.
+- **strategy**: 전이 시 now, 미전이 시 기존 member.state_changed_at 보존.
+- **plan**: upsert_membership 인자 분기. RED: 승격 후 비-전이 이벤트 → state_changed_at 보존 검증.
+- **implement**: `app/trust/service.py`. `test_state_changed_at_preserved_on_non_transition`.
+- **review**: red(12:00으로 덮임)→green(17:00 보존). 전체 405 passed, ruff/mypy clean.

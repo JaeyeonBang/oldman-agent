@@ -143,6 +143,51 @@ def test_on_off_attacker_demoted_fast(tmp_db: duckdb.DuckDBPyConnection) -> None
     assert result.violation_count == 3
 
 
+def test_state_changed_at_preserved_on_non_transition(
+    tmp_db: duckdb.DuckDBPyConnection,
+) -> None:
+    """H4 회귀 — 상태 미변경 이벤트가 state_changed_at을 joined_at으로 덮으면
+    안 된다. 이 필드는 '마지막 실제 전이 시각'을 추적해야 하며, 승격 뒤 평범한
+    이벤트가 하나 더 와도 승격 시각이 보존돼야 한다 (감사 추적 무결성)."""
+    record_trust_event(
+        tmp_db,
+        agent_id="kimbot",
+        criterion="honesty",
+        positive=True,
+        cause="canary_pass",
+        cause_ref="c-0",
+        now=T0,
+    )
+    for i in range(6):
+        record_trust_event(
+            tmp_db,
+            agent_id="kimbot",
+            criterion="reliability",
+            positive=True,
+            cause="publish_settled",
+            cause_ref=f"evt-{i}",
+            now=T0 + timedelta(hours=i),
+        )
+    member = get_membership(tmp_db, "kimbot")
+    assert member is not None and member.state == "member"
+    promoted_at = member.state_changed_at
+    assert promoted_at > member.joined_at  # 승격은 가입보다 나중
+
+    # 상태를 바꾸지 않는 평범한 이벤트 하나 더 — state_changed_at 보존돼야 함
+    record_trust_event(
+        tmp_db,
+        agent_id="kimbot",
+        criterion="reliability",
+        positive=True,
+        cause="publish_settled",
+        cause_ref="evt-later",
+        now=T0 + timedelta(hours=10),
+    )
+    member2 = get_membership(tmp_db, "kimbot")
+    assert member2 is not None and member2.state == "member"
+    assert member2.state_changed_at == promoted_at  # joined_at으로 덮이지 않음
+
+
 def test_decay_applied_between_events(tmp_db: duckdb.DuckDBPyConnection) -> None:
     record_trust_event(
         tmp_db,
