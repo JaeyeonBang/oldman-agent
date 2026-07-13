@@ -23,10 +23,13 @@ class PublishRequest(BaseModel):
     declared_source_type: SourceType
     payload: dict[str, Any]
     ts: datetime | None = None
-    seller_did: str | None = None
-    """판매자 did:key — payload_signature와 쌍으로 제공 (v2 P0 trust)."""
-    payload_signature: str | None = None
-    """payload_sha256에 대한 ed25519 서명 (base64)."""
+    seller_did: str | None = Field(default=None, max_length=128)
+    """판매자 did:key — payload_signature와 쌍으로 제공 (v2 P0 trust).
+
+    상한 128자: 실제 did:key ed25519는 ~56자. 무제한이면 base58 O(n^2) 디코드가
+    단일 writer 프로세스를 블록시키는 DoS 표면(H2)."""
+    payload_signature: str | None = Field(default=None, max_length=256)
+    """payload_sha256에 대한 ed25519 서명 (base64). 상한 256자(88자 실제)."""
 
 
 class PublishResponse(BaseModel):

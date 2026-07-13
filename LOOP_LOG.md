@@ -11,7 +11,7 @@
 | C2 | CRITICAL | honesty 승격 게이트가 decay 안 된 stale 값 사용 (whitewash 우회) | ✅ Loop 2 |
 | C3 | CRITICAL | executor 정산 generic 예외 시 ROLLBACK 누락 → 커넥션 브릭 | ✅ Loop 3 |
 | H1 | HIGH | 서명이 source_agent/메타데이터 미바인딩 → 결제 하이재킹 | ⬜ |
-| H2 | HIGH | seller_did/payload_signature 길이 무제한 → base58 DoS | ⬜ |
+| H2 | HIGH | seller_did/payload_signature 길이 무제한 → base58 DoS | ✅ Loop 4 |
 | H3 | HIGH | publish_reward=0 → 매핑 안 된 예외로 crash | ⬜ |
 | H4 | HIGH | state_changed_at이 비-전이 이벤트마다 joined_at으로 덮임 | ⬜ |
 | M1 | MEDIUM | report.py mean 미decay 표시 | ⬜ |
@@ -43,3 +43,10 @@
 - **plan**: except 절 확장. RED: credits_transfer를 RuntimeError로 monkeypatch → 이후 BEGIN 성공 검증.
 - **implement**: `app/a2a/executor.py` except 절 + `test_settlement_generic_error_rolls_back_transaction`.
 - **review**: red("cannot start a transaction within a transaction")→green. 전체 402 passed, ruff/mypy clean.
+
+## Loop 4 — H2 서명/DID 길이 상한 (base58 DoS)
+- **research**: `seller_did`/`payload_signature`에 max_length 없음. `_b58decode`는 O(n^2). 200KB 입력 → ~5s 동안 단일 writer 블록. body-size 미들웨어도 없음 → 무인증 DoS.
+- **strategy**: 경계(pydantic)에서 조기 거부. did:key ~56자→상한 128, sig 88자→상한 256.
+- **plan**: schemas.py Field(max_length=…). RED: 100K자 필드 → ValidationError.
+- **implement**: `app/api/schemas.py` 2필드. `test_publish_request_rejects_oversized_{seller_did,signature}`.
+- **review**: red(통과)→green(거부). 전체 404 passed, ruff/mypy clean.
