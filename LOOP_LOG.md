@@ -19,7 +19,7 @@
 | M2 | MEDIUM | canary used=TRUE가 trust event 전 커밋 | ⬜ |
 | M3 | MEDIUM | adjudicate_claim TOCTOU (latent) | ⬜ |
 | M4 | MEDIUM | accrue_pool_fee 멱등성 가드 없음 | ⬜ |
-| M5 | MEDIUM | credits from/to 인덱스 마이그레이션에서 유실 | ⬜ |
+| M5 | MEDIUM | credits from/to 인덱스 마이그레이션에서 유실 | ✅ Loop 8 |
 | M6 | MEDIUM | record_trust_event 50줄 초과 | ⬜ |
 
 ---
@@ -81,3 +81,10 @@
 - **implement**: `app/trust/identity.py`, `app/api/publish.py`, 호출처 5곳. hijack 테스트(publish 레벨) + source_agent 바인딩 테스트(unit).
 - **review**: red(TypeError→하이재킹 통과)→green(거부). 전체 410 passed, ruff/mypy clean, village_demo 완주(Σ400==Σ400).
 - **후속 H1b**: `agent_identities`(source_agent↔DID) 등록/강제는 등록 flow 부재 → 별도 백로그. Part 1만으로 하이재킹은 완전 차단(서명 위조 불가).
+
+## Loop 8 — M5 credits from/to 인덱스 복구
+- **research**: 002가 만든 idx_credits_tx_from/to가 006·008 테이블 재생성(DROP+RENAME)에서 소멸, 재생성 안 됨. 실측: 마이그레이션 후 credits_transactions 인덱스는 idx_credits_tx_ts만 생존. from_agent GROUP/필터 쿼리(audit·admin) full scan.
+- **strategy**: 기존 마이그레이션은 이미 적용돼 재실행 안 되므로 신규 마이그레이션 009로 IF NOT EXISTS 복구.
+- **plan**: 009_credits_indexes.sql. RED: apply_migrations 후 두 인덱스 존재 검증.
+- **implement**: `app/storage/migrations/009_credits_indexes.sql`. test_db.py 회귀.
+- **review**: red({idx_credits_tx_ts}만)→green(from/to 존재). 전체 411 passed.
