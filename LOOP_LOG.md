@@ -176,6 +176,13 @@
 - **implement**: `membership.py`(field/param/rule rename+recalibrate), `service.py`(_honesty_gate_quality: mean 반환). 테스트 인자명 갱신.
 - **review**: red(liar→member)→green(liar→provisional). C2 whitewash 테스트 보존. 전체 420 passed, ruff/mypy clean, EVAL-4 sep 0.769 PASS, trust_sim 적대 가설 a-e 전부 유지.
 
+### R2-3 — F6(a) treasury 지급능력(solvency) 검증
+- **research**: escrow는 별도 예치 계좌가 아니라 treasury에 남음(payout.py). audit의 Σ보존은 필요조건일 뿐 — 부채 초과여도 합은 맞아 지급불능을 못 잡음. treasury<open escrow면 royalty 방출이 나중에 InsufficientFunds.
+- **strategy**: audit_credits에 treasury_balance>=open_escrow_liability 검증 + solvent 필드/issue. (escrow를 실제 예치 계좌로 격리하는 것과 stale sweep은 더 큰 변경 → 후속 F6b/c.)
+- **implement**: `credits/audit.py` treasury_balance·solvent 필드 + 검증. parameterized query.
+- **review**: red(AttributeError)→green(solvent=False+issue). 전체 421 passed, ruff/mypy clean, village_demo 감사 balanced 유지.
+- **남은 R2 백로그**: F1(트러스트 루프 live 배선 — 배치 vs 인라인 의도 결정 필요), F4/L1(위반 감쇠/사면 — product), F5(TX 소유 규약 통일 — 리팩터), F6b/c(escrow 격리·sweep), F7(공유 conn lock), F8(TOFU 키 회전/폐기).
+
 ## 최종 (Loop 1-16, 2026-07-13)
 - **완료**: CRITICAL 3 + HIGH 4 + H1b + MEDIUM 6 + LOW 2(L2·L3) = 16 커밋. 코드리뷰 실행 가능 항목 전부 소진.
 - **전체 스위트**: 399 → 418 passed (신규 회귀 19건). ruff/mypy clean, village_demo 완주.
