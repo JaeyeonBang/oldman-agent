@@ -195,7 +195,12 @@ async def execute_publish(
         if (
             not req.seller_did
             or not req.payload_signature
-            or not verify_payload(req.seller_did, req.payload, req.payload_signature)
+            or not verify_payload(
+                req.seller_did,
+                req.payload,
+                req.payload_signature,
+                req.source_agent,
+            )
         ):
             raise InvalidSignatureError()
     elif settings.require_signed_publish:

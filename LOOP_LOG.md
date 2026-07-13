@@ -10,7 +10,8 @@
 | C1 | CRITICAL | 타임존 skew가 decay 계산 손상 (get_conn에 SET TimeZone 없음) | ✅ Loop 1 |
 | C2 | CRITICAL | honesty 승격 게이트가 decay 안 된 stale 값 사용 (whitewash 우회) | ✅ Loop 2 |
 | C3 | CRITICAL | executor 정산 generic 예외 시 ROLLBACK 누락 → 커넥션 브릭 | ✅ Loop 3 |
-| H1 | HIGH | 서명이 source_agent/메타데이터 미바인딩 → 결제 하이재킹 | ⬜ |
+| H1 | HIGH | 서명이 source_agent/메타데이터 미바인딩 → 결제 하이재킹 | ✅ Loop 7 (Part 1) |
+| H1b | HIGH | agent_identities 등록/강제 wiring (dead code) — 등록 flow 필요 | ⬜ |
 | H2 | HIGH | seller_did/payload_signature 길이 무제한 → base58 DoS | ✅ Loop 4 |
 | H3 | HIGH | publish_reward=0 → 매핑 안 된 예외로 crash | ✅ Loop 6 |
 | H4 | HIGH | state_changed_at이 비-전이 이벤트마다 joined_at으로 덮임 | ✅ Loop 5 |
@@ -72,3 +73,11 @@
 - **전체 스위트**: 399 → 408 passed (신규 회귀 테스트 9건). ruff/mypy clean 유지.
 - **남은 백로그**: H1(서명 메타데이터 바인딩 + agent_identities wiring — 암호 코어/publish 경계 다중 파일, 별도 집중 세션 권장), M1-M6.
 - **다음 진입점**: H1부터. `research/agent-trust-impl-plan-2026-07.md` §P0 참조. 서명 대상에 source_agent 포함 + publish 시 등록 DID 일치 강제.
+
+## Loop 7 — H1 서명 source_agent 바인딩 (Part 1)
+- **research**: `_message(payload)`가 payload만 서명 → 서명이 '무엇을'만 증명, '누가 파는가'(source_agent=결제 수취자)는 미증명. 캡처된 (did, payload, sig)를 공격자가 source_agent=carol로 먼저 제출(payload_hash 전역 UNIQUE 레이스) → 결제·평판 하이재킹.
+- **strategy**: 서명 대상에 source_agent 바인딩(`<payload_hash>|<NFC(source_agent)>`). 해시 고정 길이(64hex)라 구분자 결합 모호성 없음. sign/verify에 source_agent 필수 인자 → 미바인딩 서명 원천 차단.
+- **plan**: identity.py `_signing_message` + sign/verify 시그니처. publish.py verify에 req.source_agent. 전 호출처(테스트 3파일+village_demo) 갱신. RED: carol 재제출 → InvalidSignatureError.
+- **implement**: `app/trust/identity.py`, `app/api/publish.py`, 호출처 5곳. hijack 테스트(publish 레벨) + source_agent 바인딩 테스트(unit).
+- **review**: red(TypeError→하이재킹 통과)→green(거부). 전체 410 passed, ruff/mypy clean, village_demo 완주(Σ400==Σ400).
+- **후속 H1b**: `agent_identities`(source_agent↔DID) 등록/강제는 등록 flow 부재 → 별도 백로그. Part 1만으로 하이재킹은 완전 차단(서명 위조 불가).

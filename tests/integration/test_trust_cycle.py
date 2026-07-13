@@ -127,7 +127,9 @@ async def test_full_trust_cycle_through_executor(tmp_path: Path) -> None:
                     "declared_source_type": "third_party",
                     "payload": payload,
                     "seller_did": seller.did,
-                    "payload_signature": sign_payload(seller.seed_hex, payload),
+                    "payload_signature": sign_payload(
+                        seller.seed_hex, payload, "kimbot"
+                    ),
                 },
             )
         ),

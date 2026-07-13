@@ -50,7 +50,7 @@ async def test_signed_publish_stores_seller_did(
 ) -> None:
     ident = generate_identity()
     payload: dict[str, object] = {"text": "이봇이 약속을 지켰다"}
-    sig = sign_payload(ident.seed_hex, payload)
+    sig = sign_payload(ident.seed_hex, payload, "kimbot")
     resp = await execute_publish(
         tmp_db,
         _settings(),
@@ -67,7 +67,7 @@ async def test_signed_publish_stores_seller_did(
 @pytest.mark.asyncio
 async def test_tampered_signature_blocked(tmp_db: duckdb.DuckDBPyConnection) -> None:
     ident = generate_identity()
-    sig = sign_payload(ident.seed_hex, {"text": "원본"})
+    sig = sign_payload(ident.seed_hex, {"text": "원본"}, "kimbot")
     with pytest.raises(InvalidSignatureError):
         await execute_publish(
             tmp_db,
@@ -89,6 +89,35 @@ async def test_did_without_signature_blocked(
             _settings(),
             _req({"text": "x"}, seller_did=ident.did),
         )
+
+
+@pytest.mark.asyncio
+async def test_signature_cannot_be_reused_under_different_source_agent(
+    tmp_db: duckdb.DuckDBPyConnection,
+) -> None:
+    """H1 — 서명은 payload뿐 아니라 source_agent(결제 수취자)에도 바인딩된다.
+
+    합법 판매자가 source_agent='kimbot'로 서명한 (did, payload, sig)를 공격자가
+    관측해 source_agent='carol'로 먼저 재제출하면(payload_hash 전역 UNIQUE 레이스),
+    결제·평판이 carol에게 귀속되는 하이재킹이 가능했다. 서명이 source_agent에
+    바인딩되면 재제출 시 검증이 실패해야 한다.
+    """
+    ident = generate_identity()
+    payload: dict[str, object] = {"text": "공유된 사실"}
+    sig = sign_payload(ident.seed_hex, payload, "kimbot")
+    # carol이 동일 (did, payload, sig)를 자기 이름으로 재제출
+    hijack = PublishRequest(
+        event_kind="anecdote",
+        source_agent="carol",
+        observed_agent="leebot",
+        declared_source_type="third_party",
+        payload=payload,
+        seller_did=ident.did,
+        payload_signature=sig,
+    )
+    with pytest.raises(InvalidSignatureError):
+        await execute_publish(tmp_db, _settings(), hijack)
+    assert tmp_db.execute("SELECT COUNT(*) FROM events").fetchone()[0] == 0
 
 
 @pytest.mark.asyncio

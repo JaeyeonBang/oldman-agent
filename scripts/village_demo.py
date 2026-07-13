@@ -102,7 +102,7 @@ async def main() -> None:
                 payload=payload,
                 ts=T0 + timedelta(minutes=i),
                 seller_did=kim.did,
-                payload_signature=sign_payload(kim.seed_hex, payload),
+                payload_signature=sign_payload(kim.seed_hex, payload, "kimbot"),
             ),
         )
         assert resp.event_id is not None

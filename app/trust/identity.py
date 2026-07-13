@@ -12,6 +12,7 @@ didkit 대신 pynacl 직접 구현 — P0에는 VC 발급이 불필요하고, �
 from __future__ import annotations
 
 import base64
+import unicodedata
 from dataclasses import dataclass
 from typing import Any
 
@@ -86,22 +87,37 @@ def public_key_from_did(did: str) -> bytes:
     return raw[2:]
 
 
-def _message(payload: dict[str, Any]) -> bytes:
-    return payload_sha256(payload).encode("ascii")
+def _signing_message(payload: dict[str, Any], source_agent: str) -> bytes:
+    """서명 대상 = payload canonical 해시 + source_agent(결제 수취자).
+
+    payload 해시만 서명하면 서명이 '무엇을'만 증명하고 '누가 파는가'는 증명하지
+    못해, 캡처된 서명을 다른 source_agent로 재제출하는 결제 하이재킹이 가능하다
+    (H1). source_agent를 바인딩해 서명을 판매 행위 주체에 묶는다. 해시는 고정
+    길이(64 hex)라 ``<hash>|<agent>`` 구분자 결합이 모호하지 않다. source_agent는
+    NFC 정규화 — payload 해시의 canonical 정책과 일관.
+    """
+    normalized = unicodedata.normalize("NFC", source_agent)
+    return f"{payload_sha256(payload)}|{normalized}".encode()
 
 
-def sign_payload(seed_hex: str, payload: dict[str, Any]) -> str:
-    """payload의 canonical sha256에 대한 ed25519 서명 (base64)."""
+def sign_payload(seed_hex: str, payload: dict[str, Any], source_agent: str) -> str:
+    """(payload canonical 해시 + source_agent)에 대한 ed25519 서명 (base64)."""
     sk = SigningKey(bytes.fromhex(seed_hex))
-    return base64.b64encode(sk.sign(_message(payload)).signature).decode("ascii")
+    msg = _signing_message(payload, source_agent)
+    return base64.b64encode(sk.sign(msg).signature).decode("ascii")
 
 
-def verify_payload(did: str, payload: dict[str, Any], signature_b64: str) -> bool:
-    """검증 실패는 raise가 아니라 False — publish 경로에서 도메인 에러로 매핑."""
+def verify_payload(
+    did: str, payload: dict[str, Any], signature_b64: str, source_agent: str
+) -> bool:
+    """검증 실패는 raise가 아니라 False — publish 경로에서 도메인 에러로 매핑.
+
+    서명은 payload와 source_agent 양쪽에 바인딩 — source_agent가 다르면 실패.
+    """
     try:
         pub = public_key_from_did(did)
         sig = base64.b64decode(signature_b64.encode("ascii"), validate=True)
-        VerifyKey(pub).verify(_message(payload), sig)
+        VerifyKey(pub).verify(_signing_message(payload, source_agent), sig)
         return True
     except (InvalidDidError, BadSignatureError, ValueError, TypeError):
         return False

@@ -40,33 +40,43 @@ def test_two_identities_are_distinct() -> None:
 def test_sign_and_verify_ok() -> None:
     ident = generate_identity()
     payload = {"text": "김봇이 이봇에게 사과했다", "topic": "화해"}
-    sig = sign_payload(ident.seed_hex, payload)
-    assert verify_payload(ident.did, payload, sig) is True
+    sig = sign_payload(ident.seed_hex, payload, "kimbot")
+    assert verify_payload(ident.did, payload, sig, "kimbot") is True
+
+
+def test_signature_bound_to_source_agent() -> None:
+    """H1 — 서명은 source_agent에 바인딩. 같은 서명을 다른 source_agent로
+    제출하면 검증 실패 (결제 하이재킹 차단)."""
+    ident = generate_identity()
+    payload = {"text": "공유된 사실"}
+    sig = sign_payload(ident.seed_hex, payload, "kimbot")
+    assert verify_payload(ident.did, payload, sig, "kimbot") is True
+    assert verify_payload(ident.did, payload, sig, "carol") is False
 
 
 def test_verify_is_key_order_invariant() -> None:
     """canonical JSON 서명 — dict 키 순서가 달라도 같은 payload면 검증 통과."""
     ident = generate_identity()
-    sig = sign_payload(ident.seed_hex, {"a": 1, "b": "x"})
-    assert verify_payload(ident.did, {"b": "x", "a": 1}, sig) is True
+    sig = sign_payload(ident.seed_hex, {"a": 1, "b": "x"}, "agent")
+    assert verify_payload(ident.did, {"b": "x", "a": 1}, sig, "agent") is True
 
 
 def test_tampered_payload_fails() -> None:
     ident = generate_identity()
-    sig = sign_payload(ident.seed_hex, {"text": "원본"})
-    assert verify_payload(ident.did, {"text": "변조"}, sig) is False
+    sig = sign_payload(ident.seed_hex, {"text": "원본"}, "agent")
+    assert verify_payload(ident.did, {"text": "변조"}, sig, "agent") is False
 
 
 def test_wrong_did_fails() -> None:
     signer, other = generate_identity(), generate_identity()
     payload = {"text": "원본"}
-    sig = sign_payload(signer.seed_hex, payload)
-    assert verify_payload(other.did, payload, sig) is False
+    sig = sign_payload(signer.seed_hex, payload, "agent")
+    assert verify_payload(other.did, payload, sig, "agent") is False
 
 
 def test_garbage_signature_fails() -> None:
     ident = generate_identity()
-    assert verify_payload(ident.did, {"text": "x"}, "bm90LWEtc2ln") is False
+    assert verify_payload(ident.did, {"text": "x"}, "bm90LWEtc2ln", "agent") is False
 
 
 @pytest.mark.parametrize(
