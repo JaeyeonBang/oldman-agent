@@ -11,7 +11,7 @@
 | C2 | CRITICAL | honesty 승격 게이트가 decay 안 된 stale 값 사용 (whitewash 우회) | ✅ Loop 2 |
 | C3 | CRITICAL | executor 정산 generic 예외 시 ROLLBACK 누락 → 커넥션 브릭 | ✅ Loop 3 |
 | H1 | HIGH | 서명이 source_agent/메타데이터 미바인딩 → 결제 하이재킹 | ✅ Loop 7 (Part 1) |
-| H1b | HIGH | agent_identities 등록/강제 wiring (dead code) — 등록 flow 필요 | ⬜ |
+| H1b | HIGH | agent_identities 등록/강제 wiring (TOFU) | ✅ Loop 15 |
 | H2 | HIGH | seller_did/payload_signature 길이 무제한 → base58 DoS | ✅ Loop 4 |
 | H3 | HIGH | publish_reward=0 → 매핑 안 된 예외로 crash | ✅ Loop 6 |
 | H4 | HIGH | state_changed_at이 비-전이 이벤트마다 joined_at으로 덮임 | ✅ Loop 5 |
@@ -138,3 +138,17 @@
 - **review**: 기존 admin 토큰 테스트 4개 통과(401/200 불변), 전체 415 passed, ruff/mypy clean.
 
 - **남은 것**: H1b(agent_identities 등록/강제 — 등록 flow 설계 필요), L1(정책 결정: jaccard 오탐→영구 축출 검토), L2(마이그레이션 명시 TX wrap, 데모 수준 허용).
+
+## Loop 15 — H1b agent_identities TOFU 등록/강제
+- **research**: `storage/identities.py`(upsert/get_agent_identity)가 dead code. publish가 source_agent↔DID 바인딩을 강제하지 않아, 한 source_agent가 매 요청 다른 DID를 쓰거나 두 이름이 같은 DID를 쓸 수 있었다.
+- **strategy**: TOFU(Trust On First Use) — 최초 서명 publish에서 source_agent↔DID 등록, 이후 다른 DID면 DidMismatchError로 거부. 등록 엔드포인트 없이 기존 publish 경로에 얹어 데모 친화.
+- **plan**: DidMismatchError(PublishError) 추가. 서명 검증 통과 후 get→없으면 upsert, 있으면 일치 검증. RED: 등록 확인 + 다른 DID 거부.
+- **implement**: `app/api/publish.py` 예외 + wiring. test_publish_signed 회귀 2건.
+- **review**: red(등록 안 됨/미거부)→green. 전체 417 passed, ruff/mypy clean, village_demo 완주.
+
+---
+
+## 체크포인트 3 (Loop 1-15 완료, 2026-07-13)
+- **완료**: CRITICAL 3 + HIGH 4 + H1b + MEDIUM 6 + LOW 1(L3) = 15 커밋.
+- **전체 스위트**: 399 → 417 passed (신규 회귀 18건). ruff/mypy clean, village_demo 완주.
+- **남은 것(선택)**: L1(정책 판단), L2(마이그레이션 TX wrap, 데모 허용). 코드리뷰 실행 백로그는 전부 소진.

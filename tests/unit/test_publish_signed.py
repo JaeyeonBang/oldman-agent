@@ -14,6 +14,7 @@ import duckdb
 import pytest
 
 from app.api.publish import (
+    DidMismatchError,
     InvalidSignatureError,
     MissingSignatureError,
     execute_publish,
@@ -118,6 +119,58 @@ async def test_signature_cannot_be_reused_under_different_source_agent(
     with pytest.raises(InvalidSignatureError):
         await execute_publish(tmp_db, _settings(), hijack)
     assert tmp_db.execute("SELECT COUNT(*) FROM events").fetchone()[0] == 0
+
+
+@pytest.mark.asyncio
+async def test_first_signed_publish_registers_identity(
+    tmp_db: duckdb.DuckDBPyConnection,
+) -> None:
+    """H1b — 최초 서명 publish가 source_agent↔DID를 agent_identities에 등록(TOFU)."""
+    from app.storage.identities import get_agent_identity
+
+    ident = generate_identity()
+    payload: dict[str, object] = {"text": "첫 사실"}
+    sig = sign_payload(ident.seed_hex, payload, "kimbot")
+    await execute_publish(
+        tmp_db,
+        _settings(),
+        _req(payload, seller_did=ident.did, payload_signature=sig),
+    )
+    row = get_agent_identity(tmp_db, "kimbot")
+    assert row is not None
+    assert row.did == ident.did
+
+
+@pytest.mark.asyncio
+async def test_tofu_rejects_did_change_for_same_source_agent(
+    tmp_db: duckdb.DuckDBPyConnection,
+) -> None:
+    """H1b — 등록된 source_agent가 다른 DID로 publish 시도 → DidMismatchError.
+
+    최초 바인딩된 명의를 다른 키로 바꿔치기하는 것을 거부한다."""
+    ident_a = generate_identity()
+    ident_b = generate_identity()
+    p1: dict[str, object] = {"text": "첫 사실"}
+    await execute_publish(
+        tmp_db,
+        _settings(),
+        _req(
+            p1,
+            seller_did=ident_a.did,
+            payload_signature=sign_payload(ident_a.seed_hex, p1, "kimbot"),
+        ),
+    )
+    p2: dict[str, object] = {"text": "둘째 사실"}
+    with pytest.raises(DidMismatchError):
+        await execute_publish(
+            tmp_db,
+            _settings(),
+            _req(
+                p2,
+                seller_did=ident_b.did,
+                payload_signature=sign_payload(ident_b.seed_hex, p2, "kimbot"),
+            ),
+        )
 
 
 @pytest.mark.asyncio
