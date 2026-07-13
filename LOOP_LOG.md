@@ -12,7 +12,7 @@
 | C3 | CRITICAL | executor 정산 generic 예외 시 ROLLBACK 누락 → 커넥션 브릭 | ✅ Loop 3 |
 | H1 | HIGH | 서명이 source_agent/메타데이터 미바인딩 → 결제 하이재킹 | ⬜ |
 | H2 | HIGH | seller_did/payload_signature 길이 무제한 → base58 DoS | ✅ Loop 4 |
-| H3 | HIGH | publish_reward=0 → 매핑 안 된 예외로 crash | ⬜ |
+| H3 | HIGH | publish_reward=0 → 매핑 안 된 예외로 crash | ✅ Loop 6 |
 | H4 | HIGH | state_changed_at이 비-전이 이벤트마다 joined_at으로 덮임 | ✅ Loop 5 |
 | M1 | MEDIUM | report.py mean 미decay 표시 | ⬜ |
 | M2 | MEDIUM | canary used=TRUE가 trust event 전 커밋 | ⬜ |
@@ -57,3 +57,18 @@
 - **plan**: upsert_membership 인자 분기. RED: 승격 후 비-전이 이벤트 → state_changed_at 보존 검증.
 - **implement**: `app/trust/service.py`. `test_state_changed_at_preserved_on_non_transition`.
 - **review**: red(12:00으로 덮임)→green(17:00 보존). 전체 405 passed, ruff/mypy clean.
+
+## Loop 6 — H3 Settings 결제 하한 검증
+- **research**: config에 하한 없음. publish_reward/query_price=0 → credits_transfer(amount>0) InvalidAgentError → 매핑 안 된 크래시(C3 트리거이기도).
+- **strategy**: frozen dataclass `__post_init__`로 경계 조기 거부.
+- **plan**: publish_reward>=1, query_price>=1 검증. RED: 0/-1 → ValueError.
+- **implement**: `app/config.py` __post_init__. 신규 `tests/unit/test_config.py`.
+- **review**: red(통과)→green(거부). 전체 408 passed, ruff/mypy clean.
+
+---
+
+## 체크포인트 (Loop 1-6 완료, 2026-07-13)
+- **완료**: CRITICAL 3 (C1·C2·C3) + HIGH 3 (H2·H3·H4). 커밋 9ccd7c4→(H3).
+- **전체 스위트**: 399 → 408 passed (신규 회귀 테스트 9건). ruff/mypy clean 유지.
+- **남은 백로그**: H1(서명 메타데이터 바인딩 + agent_identities wiring — 암호 코어/publish 경계 다중 파일, 별도 집중 세션 권장), M1-M6.
+- **다음 진입점**: H1부터. `research/agent-trust-impl-plan-2026-07.md` §P0 참조. 서명 대상에 source_agent 포함 + publish 시 등록 DID 일치 강제.

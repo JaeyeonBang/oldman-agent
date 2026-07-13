@@ -36,6 +36,14 @@ class Settings:
     # oldman 자신의 did:key seed (32B hex). 미설정 시 카드에 DID 미게재.
     oldman_did_seed: str | None = None
 
+    def __post_init__(self) -> None:
+        # 결제 금액 하한 — credits_transfer는 amount>0을 요구하므로 0/음수면
+        # publish/query가 매핑 안 된 예외로 크래시한다(H3). 경계에서 조기 거부.
+        if self.publish_reward < 1:
+            raise ValueError(f"publish_reward must be >= 1, got {self.publish_reward}")
+        if self.query_price < 1:
+            raise ValueError(f"query_price must be >= 1, got {self.query_price}")
+
     @classmethod
     def from_env(cls) -> Settings:
         return cls(
