@@ -73,6 +73,30 @@ def test_split_pays_listing_fee_and_escrows_rest(
     assert row == ("kimbot", 4, "open")
 
 
+def test_release_skips_self_citation(tmp_db: duckdb.DuckDBPyConnection) -> None:
+    """F2 — 판매자가 자기 event를 인용해 escrow를 회수하는 self-dealing 차단.
+
+    querier==seller면 royalty를 방출하지 않고 escrow를 open으로 남긴다(미래
+    독립 인용/만료 대기). 이게 없으면 조작 정보가 자가 인용으로 deferred 수익을
+    회수해 '조작은 못 번다' 논지가 붕괴한다."""
+    settings = _settings()
+    _split(tmp_db, settings)  # kimbot escrow 4 open, 잔고 grant+1
+    releases = release_royalties_for_citations(
+        tmp_db,
+        settings,
+        citation_event_ids=[EVT1],
+        invoice_id=INV1,
+        now=T0 + timedelta(days=1),
+        querier_agent="kimbot",  # 자가 인용
+    )
+    assert all(r.status != "paid" for r in releases)  # 지급 없음
+    assert get_balance(tmp_db, "kimbot") == settings.starting_grant + 1  # 잔고 불변
+    row = tmp_db.execute(
+        "SELECT status FROM royalty_escrows WHERE event_id = ?", [EVT1]
+    ).fetchone()
+    assert row == ("open",)  # 여전히 open — 독립 인용 대기
+
+
 def test_split_with_reward_1_has_no_escrow(
     tmp_db: duckdb.DuckDBPyConnection,
 ) -> None:

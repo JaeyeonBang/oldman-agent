@@ -160,6 +160,16 @@
 - **implement**: `app/storage/db.py`. test_db 회귀.
 - **review**: red(zzz_partial 잔존)→green(롤백). 전체 418 passed(기존 006/008 DROP+RENAME도 TX 내 정상), ruff/mypy clean.
 
+## Round 2 — 외부 아키텍처 검토 후속 (feat/v2-trust-round2)
+
+> 독립 아키텍트(fresh-eyes) 검토가 diff 범위 리뷰들이 놓친 구조적 결함 발견. F1-F8. 확인된 로직 홀부터 TDD 수정.
+
+### R2-1 — F2 royalty self-dealing 차단
+- **research**: `release_royalties_for_citations`가 querier 독립성 미검증 → 판매자가 자기 event를 자기 query로 인용해 escrow 전액 회수. "조작 정보는 deferred 수익 못 얻음" 논지 붕괴. corroboration은 self-corroboration 거부하는데 payout엔 없음.
+- **strategy**: querier_agent 인자 추가, seller==querier면 방출 스킵(escrow open 유지). 잔여 한계(단일 운영자 다계정)는 외부 신원 필요 → 데모 밖, 문서화.
+- **implement**: `payout.py` 가드 + `executor.py` querier 전달. RoyaltyRelease status에 skipped_self_citation.
+- **review**: red(TypeError)→green(escrow open 유지, 잔고 불변). 전체 419 passed, ruff/mypy clean.
+
 ## 최종 (Loop 1-16, 2026-07-13)
 - **완료**: CRITICAL 3 + HIGH 4 + H1b + MEDIUM 6 + LOW 2(L2·L3) = 16 커밋. 코드리뷰 실행 가능 항목 전부 소진.
 - **전체 스위트**: 399 → 418 passed (신규 회귀 19건). ruff/mypy clean, village_demo 완주.

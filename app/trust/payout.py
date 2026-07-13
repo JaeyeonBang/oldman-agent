@@ -39,7 +39,7 @@ class RoyaltyRelease:
     event_id: str
     seller_agent: str
     amount: int
-    status: Literal["paid", "expired"]
+    status: Literal["paid", "expired", "skipped_self_citation"]
 
 
 def split_publish_payment(
@@ -93,12 +93,18 @@ def release_royalties_for_citations(
     citation_event_ids: list[str],
     invoice_id: str | None,
     now: datetime,
+    querier_agent: str | None = None,
 ) -> list[RoyaltyRelease]:
     """유료 query의 citation에 대응하는 open escrow를 해제 (자체 TX).
 
     - 기한 내 인용 → royalty 지급 (oldman → seller, 원인 ref = invoice)
     - 기한 경과 → 소멸 (지급 없음)
     - open escrow 없는 citation → no-op (이중 지급 방지)
+    - **자가 인용(querier==seller) → 스킵**: 조작 정보를 자기 query로 인용해
+      escrow를 회수하는 self-dealing 차단 (F2). escrow는 open으로 남겨 미래
+      독립 인용/만료를 기다린다. corroboration.py의 self-corroboration 거부와 동일 원리.
+      잔여 한계: 단일 운영자가 별도 계정/DID로 인용하면 막지 못한다 — 외부
+      operator 신원이 필요하며 자가운영 데모 범위 밖.
     """
     results: list[RoyaltyRelease] = []
     if not citation_event_ids:
@@ -114,6 +120,17 @@ def release_royalties_for_citations(
             if row is None:
                 continue
             seller, amount, expires_ts = row[0], int(row[1]), row[2]
+            if querier_agent is not None and seller == querier_agent:
+                # 자가 인용 — 방출하지 않고 escrow는 open 유지 (F2).
+                results.append(
+                    RoyaltyRelease(
+                        event_id=event_id,
+                        seller_agent=seller,
+                        amount=amount,
+                        status="skipped_self_citation",
+                    )
+                )
+                continue
             if expires_ts.tzinfo is None:
                 expires_ts = expires_ts.replace(tzinfo=now.tzinfo)
             if now > expires_ts:
