@@ -10,6 +10,15 @@ honesty 축의 오라클 (devil's advocate C1 해소 — grounding이 아니라 
 
 판정은 tokenize + jaccard 대조 — 결정적이고 LLM이 불필요 (mock-friendly).
 LLM judge 보조 판정은 P4+에서 선택 부착 (단독 심판 금지 원칙).
+
+한계 (probe.py와 동일한 blunt-heuristic 주의, L1): jaccard 임계(기본 0.6)는
+토큰 겹침만 본다 — 사실은 충실하되 표현만 바꾼 정직한 의역(paraphrase)이 임계
+아래로 떨어져 canary_fail로 오판될 수 있다. canary_fail은 honesty 위반 →
+violation_count 증가(단조·회복 불가)로 흘러 회복 bar를 영구히 높인다. 즉
+오탐 1건이 정직한 판매자에게 영구 손상을 준다. 이 정책(엄격한 단조 제재)이
+의도인지, semantic judge/사면 경로를 붙일지는 product 결정 사항 (trust/** 변경
+시 EVAL-4 재실행 필요 → 별도 사이클). 현 데모("실적대 없음" 프레이밍)에서는
+엄격 유지가 기본.
 """
 
 from __future__ import annotations

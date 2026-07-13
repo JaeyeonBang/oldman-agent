@@ -164,3 +164,10 @@
 - **완료**: CRITICAL 3 + HIGH 4 + H1b + MEDIUM 6 + LOW 2(L2·L3) = 16 커밋. 코드리뷰 실행 가능 항목 전부 소진.
 - **전체 스위트**: 399 → 418 passed (신규 회귀 19건). ruff/mypy clean, village_demo 완주.
 - **남은 것**: L1(product 정책 결정 — jaccard 오탐→영구 축출이 의도인지 사용자 판단 필요, 코드 변경 아님).
+
+## Loop 17 — L1 canary blunt-heuristic caveat (docstring)
+- **research**: 리뷰어 L1(LOW)은 정책 변경이 아니라 문서 갭 — probe.py는 jaccard 한계를 자기문서화하는데 canary.py엔 없음. 오탐(정직한 의역→canary_fail→영구 회복바 손상) 위험을 명시하라는 요청.
+- **strategy**: canary.py docstring에 한계 caveat 추가 + 정책 판단(엄격 유지 vs semantic judge/사면)이 product 결정임을 명시. 동작 무변경.
+- **implement**: `app/trust/canary.py` docstring only.
+- **review**: ruff clean, 전체 418 passed(불변), EVAL-4 separation 0.769 PASS(baseline 유지 — docstring이 결정적 eval에 무영향 실증).
+- **결과**: 코드리뷰 전 severity(C/H/M/L) 백로그 완전 종결. 큰 정책 변경(semantic judge/사면)은 여전히 별도 product 사이클.
