@@ -34,12 +34,15 @@ class MembershipPolicy:
     penalize_below: float = 0.25
     exclude_violations: int = 4
     recovery_penalty_per_violation: float = 0.05
-    # member 승격에 요구되는 honesty 증거 질량 (canary 통과 등).
-    # 물량 정크 판매(reliability만 누적)로 감사 없이 제값을 받는 구멍 차단.
-    # 게이트 입력은 now까지 decay된 값이므로(service.py), 이 임계는 "약 1
-    # honesty 반감기(60일) 내 감사 1회"에 해당 — 오래된 canary 1회로 whitewash
-    # 승격되는 것을 막으면서 최근 감사는 정당하게 통과시킨다.
-    promote_min_honesty_observations: float = 0.5
+    # member 승격에 요구되는 honesty 증거의 질(quality) — canary로 쌓인 honesty
+    # 점수의 now-decay된 mean이 이 값을 초과해야 한다. 증거 '양'(observations)이
+    # 아니라 '질'을 봐야, canary 실패(관측량은 늘지만 점수는 낮음)가 게이트를
+    # 통과하지 못한다 (F3). 물량 정크(감사 없음)와 whitewash(오래된 감사)도 함께
+    # 차단: 감사 없으면 quality 0.0, 오래되면 decay로 prior(0.25) 쪽으로 회귀.
+    # 임계 0.3 = prior mean 0.25 + 여유. 감쇠된 pass의 mean은 0.25로 위에서
+    # 점근하므로 prior에 딱 맞추면(0.25) stale pass가 아슬히 통과된다. 0.3이면
+    # canary 1회 pass가 약 108일 유효 후 만료돼 whitewash가 차단된다.
+    promote_min_honesty_quality: float = 0.3
 
 
 DEFAULT_POLICY = MembershipPolicy()
@@ -51,7 +54,7 @@ def evaluate_transition(
     score_lower: float,
     observations: float,
     violation_count: int,
-    honesty_observations: float | None = None,
+    honesty_quality: float | None = None,
     policy: MembershipPolicy = DEFAULT_POLICY,
 ) -> MembershipState:
     """ledger 스냅샷 기준 다음 멤버십 상태 (선언적 규칙, 위에서부터 우선).
@@ -60,9 +63,9 @@ def evaluate_transition(
     ② 증거 부족("미지")이면 제재하지 않고 유지.
     ③ 점수 기반 강등 (penalize < warn).
     ④ 회복/승격 — bar는 위반 이력에 비례해 상승. member 승격은 honesty
-       증거(canary 통과)를 추가로 요구 — 물량 정크로 감사 없이 제값을
-       받는 구멍 차단. ``honesty_observations=None``은 "정보 없음"으로
-       규칙을 건너뛴다 (순수 함수 단독 사용 시 호출자 책임).
+       증거의 질(now-decay된 honesty mean > prior)을 추가로 요구 — 물량 정크·
+       whitewash·감사 실패를 함께 차단. ``honesty_quality=None``은 "정보 없음"
+       으로 규칙을 건너뛴다 (순수 함수 단독 사용 시 호출자 책임).
     """
     if state == "excluded" or violation_count >= policy.exclude_violations:
         return "excluded"
@@ -78,9 +81,9 @@ def evaluate_transition(
     )
     if score_lower >= recovery_bar:
         if (
-            honesty_observations is not None
-            and honesty_observations < policy.promote_min_honesty_observations
+            honesty_quality is not None
+            and honesty_quality <= policy.promote_min_honesty_quality
         ):
-            return state  # 감사 통과 없인 member 없음
+            return state  # 무지 기준선 넘는 정직 증거 없인 member 없음
         return "member"
     return state

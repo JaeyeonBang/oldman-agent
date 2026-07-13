@@ -76,7 +76,7 @@ def _decayed_updated_score(
     return update(score, positive=positive, weight=weight, policy=ledger_policy)
 
 
-def _honesty_gate_observations(
+def _honesty_gate_quality(
     conn: duckdb.DuckDBPyConnection,
     *,
     agent_id: str,
@@ -85,14 +85,16 @@ def _honesty_gate_observations(
     ts: datetime,
     ledger_policy: LedgerPolicy,
 ) -> float:
-    """member 승격 게이트용 honesty 증거 질량 — now까지 decay한 값.
+    """member 승격 게이트용 honesty 증거의 질(mean) — now까지 decay한 값.
 
-    갱신 중인 축이 honesty면 방금 계산한 값, 아니면 저장된 honesty를 now까지
-    감쇠(없으면 0). decay 없이 raw 값을 읽으면 stale honesty(예: 오래전 canary
-    1회)로 감사 없이 승격되는 whitewash 우회가 열린다 (C2).
+    증거 '양'(observations)이 아니라 '질'(mean)을 반환한다. canary 실패도 관측량은
+    늘리므로, 양을 게이트로 쓰면 거짓말한 에이전트가 통과된다 (F3). mean은 실패 시
+    낮아지므로 질-게이트가 이를 막는다. 감사 이력이 없으면 0.0(승격 차단). 갱신
+    중인 축이 honesty면 방금 계산한 값, 아니면 저장된 honesty를 now까지 감쇠 —
+    오래된 감사는 prior(0.25)로 회귀해 whitewash도 함께 막힌다 (C2).
     """
     if criterion == "honesty":
-        return current_score.observations
+        return current_score.mean
     stored_honesty = get_trust_score(conn, agent_id, "honesty")
     if stored_honesty is None:
         return 0.0
@@ -102,7 +104,7 @@ def _honesty_gate_observations(
         h_score,
         elapsed_days=h_elapsed,
         half_life_days=ledger_policy.half_life_for("honesty"),
-    ).observations
+    ).mean
 
 
 def record_trust_event(
@@ -148,7 +150,7 @@ def record_trust_event(
         if not positive:
             violations += 1
 
-        honesty_obs = _honesty_gate_observations(
+        honesty_quality = _honesty_gate_quality(
             conn,
             agent_id=agent_id,
             criterion=criterion,
@@ -162,7 +164,7 @@ def record_trust_event(
             score_lower=score.lower_bound(),
             observations=score.observations,
             violation_count=violations,
-            honesty_observations=honesty_obs,
+            honesty_quality=honesty_quality,
             policy=membership_policy,
         )
 

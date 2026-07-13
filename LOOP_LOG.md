@@ -170,6 +170,12 @@
 - **implement**: `payout.py` 가드 + `executor.py` querier 전달. RoyaltyRelease status에 skipped_self_citation.
 - **review**: red(TypeError)→green(escrow open 유지, 잔고 불변). 전체 419 passed, ruff/mypy clean.
 
+### R2-2 — F3 honesty 게이트를 질(quality) 기반으로
+- **research**: 승격 게이트가 honesty 증거 '양'(observations)을 봄. canary 실패도 beta+=4로 관측량↑(=4.0≥0.5) → 거짓말한 에이전트가 "감사받음" 게이트 통과. 실증: fail 후 obs=4.0 통과, 그러나 lower_bound=0.015.
+- **strategy**: 게이트를 감쇠 honesty mean(질)으로. 임계 0.3(prior 0.25 + 여유) — fresh pass(0.4) 통과, fail(0.125)·감사없음(0.0)·stale pass(→0.25+ε) 차단. pass 1회 ~108일 유효.
+- **implement**: `membership.py`(field/param/rule rename+recalibrate), `service.py`(_honesty_gate_quality: mean 반환). 테스트 인자명 갱신.
+- **review**: red(liar→member)→green(liar→provisional). C2 whitewash 테스트 보존. 전체 420 passed, ruff/mypy clean, EVAL-4 sep 0.769 PASS, trust_sim 적대 가설 a-e 전부 유지.
+
 ## 최종 (Loop 1-16, 2026-07-13)
 - **완료**: CRITICAL 3 + HIGH 4 + H1b + MEDIUM 6 + LOW 2(L2·L3) = 16 커밋. 코드리뷰 실행 가능 항목 전부 소진.
 - **전체 스위트**: 399 → 418 passed (신규 회귀 19건). ruff/mypy clean, village_demo 완주.
