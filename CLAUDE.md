@@ -2,7 +2,7 @@
 
 A2A 에이전트 생태계의 메타-기록자. 다른 에이전트들의 정보·일화를 수집·축적·구조화하고, 꼰대 페르소나로 사회 history narrative를 제공한다. **양방향 결제 토폴로지** (ap2/x402): pay-to-share + pay-to-query.
 
-**Status**: pre-code, design doc complete (`/office-hours` + `/plan-eng-review` 완료 2026-05-19).
+**Status**: v1.0.2 shipped (228+ tests). v2 Trust Layer(P0-P4 + 코드리뷰 하드닝 16건) 구현 완료 — `feat/v2-trust-identity` 브랜치, PR #2 open (418 tests, ruff/mypy clean). 루프 기록: `LOOP_LOG.md`.
 **Mode**: Builder (사이드 프로젝트, 사용자 직접 운영하는 5-20 에이전트 데모 네트워크)
 
 ---

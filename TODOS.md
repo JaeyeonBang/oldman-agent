@@ -1,6 +1,6 @@
 # TODOS — oldman_agent
 
-## Current state (2026-05-20 — v1.0.2)
+## Current state (2026-07-13 — v2 Trust Layer, PR #2 open)
 
 - PRD: `.claude/prds/oldman-agent-v1.prd.md` (Option A memory architecture)
 - Implementation plan (M1): `prompt_plan.md` (engineering-reviewed, T1-T8 applied)
@@ -15,6 +15,10 @@
 - [~] **M5 — Dogfood ship**: Docker Compose single-command + README polish + DESIGN_NOTES.md + bootstrap provider wiring. *Partial — 2026-05-20. Core v1 ship complete. Demo 영상은 인간 녹화 필요 → 사용자에게 위임.*
 - [x] **v1.0.1 — Plan debt resolution**: OpenRouter real provider + config-driven bootstrap + a2a-sdk adoption + /agent-card A2A v0.2 compliance. *Shipped 2026-05-20, 201/201 tests, ruff/mypy clean.*
 - [x] **v1.0.2 — Tier 1 polish**: Smart MockProvider (mode-aware) + CI workflow + pre-commit config + 꼰대 페르소나 토글 (OLDMAN_PERSONA). *Shipped 2026-05-20, 228+ tests, ≥93% coverage.*
+- [~] **v2 — Trust Layer("동네 사랑방 제도")**: P0 did:key 신원 + P1 Beta 신뢰 ledger/마을 명부 + P2 층위 결제·escrow + P3 canary/probe/모순 오라클 + P4 제재·환불 풀·평판 narrative + ERC-8004 produce-only + credits 회계 invariant. 다중 에이전트 코드리뷰 후 하드닝 16건(C1-3/H1-4+H1b/M1-6/L2-3) TDD 수정. *`feat/v2-trust-identity`, PR #2 open 2026-07-13, 418 tests, ruff/mypy clean, village_demo 완주. 루프 기록: `LOOP_LOG.md`.*
+  - [ ] L1 (product 판단): canary jaccard 오탐 → 영구 축출 정책 유지 여부 결정 (semantic judge/appeal 경로는 EVAL 재실행 유발 → 별도 사이클)
+  - [ ] ERC-8004 testnet 실등록 (`scripts/erc8004_register.py --execute`) — 사용자 게이트
+  - [ ] live EVAL-2/3 (OLDMAN_PERSONA=kkondae, OpenRouter) — 사용자 게이트
 
 ## M5 entry checklist (when starting M5)
 
