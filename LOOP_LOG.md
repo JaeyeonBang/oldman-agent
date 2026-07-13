@@ -15,7 +15,7 @@
 | H2 | HIGH | seller_did/payload_signature 길이 무제한 → base58 DoS | ✅ Loop 4 |
 | H3 | HIGH | publish_reward=0 → 매핑 안 된 예외로 crash | ✅ Loop 6 |
 | H4 | HIGH | state_changed_at이 비-전이 이벤트마다 joined_at으로 덮임 | ✅ Loop 5 |
-| M1 | MEDIUM | report.py mean 미decay 표시 | ⬜ |
+| M1 | MEDIUM | report.py mean 미decay 표시 | ✅ Loop 9 |
 | M2 | MEDIUM | canary used=TRUE가 trust event 전 커밋 | ⬜ |
 | M3 | MEDIUM | adjudicate_claim TOCTOU (latent) | ⬜ |
 | M4 | MEDIUM | accrue_pool_fee 멱등성 가드 없음 | ⬜ |
@@ -88,3 +88,10 @@
 - **plan**: 009_credits_indexes.sql. RED: apply_migrations 후 두 인덱스 존재 검증.
 - **implement**: `app/storage/migrations/009_credits_indexes.sql`. test_db.py 회귀.
 - **review**: red({idx_credits_tx_ts}만)→green(from/to 존재). 전체 411 passed.
+
+## Loop 9 — M1 report 표시 점수 decay
+- **research**: `report.py:85`가 stored[0].mean을 decay 없이 표시 → 1년 전 고득점 판매자가 여전히 "열에 8쯤"으로 서술(C1/ledger 전제 위반).
+- **strategy**: build_reputation_report에 now 옵션 추가, 표시 전 각 축 점수를 now까지 decay. 기본값=실제 시각이라 executor 호출부 무변경.
+- **plan**: report.py now 파라미터 + decay. RED: fresh vs 400일 stale 리포트 digit 비교.
+- **implement**: `app/trust/report.py`. test_trust_report 회귀.
+- **review**: red(now 인자 부재)→green(stale digit < fresh digit). 전체 412 passed, ruff/mypy clean.

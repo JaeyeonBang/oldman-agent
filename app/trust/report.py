@@ -11,10 +11,13 @@ EVAL-2/3 재실행과 함께 후속 — prompts/renderer 미접촉으로 기존 
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from datetime import UTC, datetime
 
 import duckdb
 
 from app.storage.trust import get_membership, get_trust_score
+from app.trust.ledger import DEFAULT_POLICY as DEFAULT_LEDGER_POLICY
+from app.trust.ledger import decay
 from app.trust.membership import MembershipState
 
 _STATE_VERDICTS: dict[MembershipState, str] = {
@@ -47,6 +50,7 @@ def build_reputation_report(
     *,
     subject_agent: str,
     max_citations: int = 5,
+    now: datetime | None = None,
 ) -> ReputationReport:
     member = get_membership(conn, subject_agent)
     if member is None:
@@ -78,11 +82,21 @@ def build_reputation_report(
     parts = [
         f"내가 보기엔 {subject_agent} 그놈은 {_STATE_VERDICTS[member.state]}."
     ]
+    ts = now or datetime.now(UTC)
     scores = []
     for criterion, label in (("reliability", "거래는"), ("honesty", "말은")):
         stored = get_trust_score(conn, subject_agent, criterion)
         if stored is not None:
-            scores.append(f"{label} 열에 {round(stored[0].mean * 10)}쯤 믿네")
+            # 표시 전 now까지 감쇠 — 오래 방치된 신뢰는 prior 쪽으로 회귀해야
+            # '최근 행동이 지배'라는 ledger 전제와 일치한다 (M1).
+            prev_score, last_ts = stored
+            elapsed_days = max(0.0, (ts - last_ts).total_seconds() / 86400.0)
+            decayed = decay(
+                prev_score,
+                elapsed_days=elapsed_days,
+                half_life_days=DEFAULT_LEDGER_POLICY.half_life_for(criterion),
+            )
+            scores.append(f"{label} 열에 {round(decayed.mean * 10)}쯤 믿네")
     if scores:
         parts.append(", ".join(scores) + ".")
     if member.violation_count > 0:
