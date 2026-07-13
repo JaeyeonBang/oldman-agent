@@ -42,6 +42,34 @@ def test_plant_and_pick_unused(tmp_db: duckdb.DuckDBPyConnection) -> None:
     assert row.answer_key == ANSWER_KEY
 
 
+def test_canary_not_consumed_if_trust_event_fails(
+    tmp_db: duckdb.DuckDBPyConnection, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """M2 회귀 — record_trust_event가 실패하면 canary가 used로 소모되면 안 된다.
+    used를 trust event 전에 커밋하면 실패 시 honesty 신호가 유실되고 재감사도
+    불가능해진다. 성공 후에만 소모돼야 재시도 가능."""
+    import app.trust.canary as canary_mod
+
+    canary_id = _plant(tmp_db)
+
+    def _boom(*args: object, **kwargs: object) -> None:
+        raise RuntimeError("trust event failed")
+
+    monkeypatch.setattr(canary_mod, "record_trust_event", _boom)
+    with pytest.raises(RuntimeError):
+        judge_canary_response(
+            tmp_db,
+            canary_id=canary_id,
+            seller_agent="kimbot",
+            response_payload=ANSWER_KEY,
+            now=T0,
+        )
+    used = tmp_db.execute(
+        "SELECT used FROM canary_pool WHERE canary_id = ?", [canary_id]
+    ).fetchone()
+    assert used is not None and used[0] is False  # 미소모 — 재감사 가능
+
+
 def test_faithful_response_records_honesty_pass(
     tmp_db: duckdb.DuckDBPyConnection,
 ) -> None:

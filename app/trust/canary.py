@@ -134,11 +134,9 @@ def judge_canary_response(
     score = _jaccard(tokenize(response_payload), tokenize(answer_key))
     passed = score >= threshold
 
-    conn.execute(
-        "UPDATE canary_pool SET used = TRUE, used_ts = ? WHERE canary_id = ?",
-        [now, canary_id],
-    )
-
+    # honesty 신호를 먼저 durably 기록한 뒤에 canary를 소모한다 — 순서를 반대로
+    # 하면 record_trust_event 실패 시 canary만 소모되어 감사 신호가 유실되고
+    # 재감사도 불가능해진다 (M2). 실패하면 여기서 raise되어 used=FALSE 유지.
     trust = record_trust_event(
         conn,
         agent_id=seller_agent,
@@ -148,6 +146,11 @@ def judge_canary_response(
         cause="canary_pass" if passed else "canary_fail",
         cause_ref=canary_id,
         now=now,
+    )
+
+    conn.execute(
+        "UPDATE canary_pool SET used = TRUE, used_ts = ? WHERE canary_id = ?",
+        [now, canary_id],
     )
     return CanaryVerdict(
         canary_id=canary_id,

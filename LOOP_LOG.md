@@ -16,7 +16,7 @@
 | H3 | HIGH | publish_reward=0 → 매핑 안 된 예외로 crash | ✅ Loop 6 |
 | H4 | HIGH | state_changed_at이 비-전이 이벤트마다 joined_at으로 덮임 | ✅ Loop 5 |
 | M1 | MEDIUM | report.py mean 미decay 표시 | ✅ Loop 9 |
-| M2 | MEDIUM | canary used=TRUE가 trust event 전 커밋 | ⬜ |
+| M2 | MEDIUM | canary used=TRUE가 trust event 전 커밋 | ✅ Loop 10 |
 | M3 | MEDIUM | adjudicate_claim TOCTOU (latent) | ⬜ |
 | M4 | MEDIUM | accrue_pool_fee 멱등성 가드 없음 | ⬜ |
 | M5 | MEDIUM | credits from/to 인덱스 마이그레이션에서 유실 | ✅ Loop 8 |
@@ -95,3 +95,10 @@
 - **plan**: report.py now 파라미터 + decay. RED: fresh vs 400일 stale 리포트 digit 비교.
 - **implement**: `app/trust/report.py`. test_trust_report 회귀.
 - **review**: red(now 인자 부재)→green(stale digit < fresh digit). 전체 412 passed, ruff/mypy clean.
+
+## Loop 10 — M2 canary 소모 순서
+- **research**: `canary.py`가 used=TRUE(autocommit)를 record_trust_event 전에 커밋 → 후자 실패 시 canary만 소모되고 honesty 신호 유실 + 재감사 불가.
+- **strategy**: 순서 반대로 — honesty 기록 성공 후에만 canary 소모. 실패 시 raise로 used=FALSE 유지.
+- **plan**: judge_canary_response 두 문장 순서 교체. RED: record_trust_event monkeypatch로 실패 → used 미소모 검증.
+- **implement**: `app/trust/canary.py`. test_trust_canary 회귀.
+- **review**: red(used=True 소모)→green(used=False). 전체 413 passed, ruff/mypy clean.
