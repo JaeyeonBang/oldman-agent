@@ -83,6 +83,40 @@ def test_junk_volume_without_audit_never_promotes(
     assert result.state == "provisional"  # 감사 통과 없인 제값 없음
 
 
+def test_stale_honesty_pass_does_not_promote_after_long_gap(
+    tmp_db: duckdb.DuckDBPyConnection,
+) -> None:
+    """C2 회귀 — whitewash 우회 차단.
+
+    canary 1회 통과 후 장기 공백(400일) 동안 감사 없이 reliability만 쌓아도,
+    decay된 honesty 증거 질량이 승격 임계 미만이면 member 승격 불가. 게이트가
+    stored honesty를 decay 없이 읽으면 stale 값(1.0)으로 통과해 버린다.
+    (동일 시나리오를 공백 없이 돌리면 test_promotion_after_sustained_honesty처럼
+    member로 승격 — 유일한 차이는 honesty decay다.)
+    """
+    record_trust_event(
+        tmp_db,
+        agent_id="whitewash",
+        criterion="honesty",
+        positive=True,
+        cause="canary_pass",
+        cause_ref="c-0",
+        now=T0,
+    )
+    late = T0 + timedelta(days=400)  # honesty 반감기(60일)의 6.6배 — 증거 소멸
+    for i in range(6):
+        result = record_trust_event(
+            tmp_db,
+            agent_id="whitewash",
+            criterion="reliability",
+            positive=True,
+            cause="publish_settled",
+            cause_ref=f"late-{i}",
+            now=late + timedelta(hours=i),
+        )
+    assert result.state == "provisional"  # stale honesty로는 승격 못 함
+
+
 def test_on_off_attacker_demoted_fast(tmp_db: duckdb.DuckDBPyConnection) -> None:
     """느리게 얻은 신뢰가 배신 3회에 무너진다 — 비대칭 동역학의 통합 검증."""
     for i in range(6):

@@ -99,12 +99,23 @@ def record_trust_event(
             violations += 1
 
         # member 승격 게이트용 honesty 증거 질량 — 갱신 중인 축이 honesty면
-        # 방금 계산한 값, 아니면 저장된 값 (없으면 0 = 감사 이력 없음).
+        # 방금 계산한 값, 아니면 저장된 값을 now까지 decay한 값 (없으면 0).
+        # decay 없이 raw 값을 읽으면 stale honesty(예: 오래전 canary 1회)로
+        # 감사 없이 승격되는 whitewash 우회가 열린다 — 갱신 축과 동일하게 감쇠.
         if criterion == "honesty":
             honesty_obs = score.observations
         else:
             stored_honesty = get_trust_score(conn, agent_id, "honesty")
-            honesty_obs = stored_honesty[0].observations if stored_honesty else 0.0
+            if stored_honesty is None:
+                honesty_obs = 0.0
+            else:
+                h_score, h_last_ts = stored_honesty
+                h_elapsed = max(0.0, (ts - h_last_ts).total_seconds() / 86400.0)
+                honesty_obs = decay(
+                    h_score,
+                    elapsed_days=h_elapsed,
+                    half_life_days=ledger_policy.half_life_for("honesty"),
+                ).observations
 
         new_state = evaluate_transition(
             state=prev_state,

@@ -36,7 +36,10 @@ class MembershipPolicy:
     recovery_penalty_per_violation: float = 0.05
     # member 승격에 요구되는 honesty 증거 질량 (canary 통과 등).
     # 물량 정크 판매(reliability만 누적)로 감사 없이 제값을 받는 구멍 차단.
-    promote_min_honesty_observations: float = 1.0
+    # 게이트 입력은 now까지 decay된 값이므로(service.py), 이 임계는 "약 1
+    # honesty 반감기(60일) 내 감사 1회"에 해당 — 오래된 canary 1회로 whitewash
+    # 승격되는 것을 막으면서 최근 감사는 정당하게 통과시킨다.
+    promote_min_honesty_observations: float = 0.5
 
 
 DEFAULT_POLICY = MembershipPolicy()
